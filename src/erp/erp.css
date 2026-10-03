@@ -1,0 +1,68 @@
+/* Owner: Pablo. Fake ERP: deliberately plain enterprise look so it reads as "real work software" on screen.
+   Root is .erp-app (not .erp) so the shared .erp rules in styles.css don't apply here. */
+.erp-app {
+  --erp-bg: #f3f4f6; --erp-card: #ffffff; --erp-ink: #1f2937; --erp-muted: #6b7280; --erp-line: #d1d5db;
+  --erp-brand: #1e3a5f; --erp-accent: #2563eb; --erp-ok: #047857; --erp-bad: #b91c1c; --erp-bad-soft: #fee2e2;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px; color: var(--erp-ink); background: var(--erp-bg);
+  margin: -16px; min-height: calc(100vh - 44px); display: flex; flex-direction: column;
+}
+.erp-app * { box-sizing: border-box; }
+
+.erp-bar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--erp-brand); color: #fff; }
+.erp-logo { font-weight: 700; letter-spacing: .02em; }
+.erp-mod { opacity: .8; }
+.erp-mode { margin-left: auto; font-size: 12px; padding: 3px 10px; border-radius: 99px; background: rgba(255,255,255,.15); }
+.erp-mode.teach { background: #f59e0b; color: #1f1300; }
+
+.erp-body { flex: 1; display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
+.erp-list { border-right: 1px solid var(--erp-line); background: var(--erp-card); overflow: auto; }
+.erp-list-head { padding: 12px 16px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--erp-muted); border-bottom: 1px solid var(--erp-line); }
+.erp-row {
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 12px 16px; border-bottom: 1px solid var(--erp-line);
+}
+.erp-row:hover { background: #f9fafb; }
+.erp-row.on { background: #eff6ff; box-shadow: inset 3px 0 0 var(--erp-accent); }
+.erp-row:focus-visible { outline: 2px solid var(--erp-accent); outline-offset: -2px; }
+.erp-row-id { font-weight: 600; font-variant-numeric: tabular-nums; }
+.erp-row-sup { color: var(--erp-muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erp-row-amt { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
+
+.erp-st { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: #e5e7eb; color: #374151; justify-self: end; white-space: nowrap; }
+.erp-st.posted { background: #d1fae5; color: var(--erp-ok); }
+.erp-st.held { background: #fef3c7; color: #92400e; }
+.erp-st.pending_approval { background: #e0e7ff; color: #3730a3; }
+
+.erp-detail { padding: 24px 32px; overflow: auto; }
+.erp-empty { color: var(--erp-muted); }
+.erp-detail form { max-width: 760px; display: flex; flex-direction: column; gap: 20px; }
+.erp-title { display: flex; align-items: center; gap: 12px; }
+.erp-title h1 { margin: 0; font-size: 22px; }
+
+.erp-facts { margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 8px 16px; background: var(--erp-card); border: 1px solid var(--erp-line); border-radius: 6px; padding: 16px; }
+.erp-facts dt { color: var(--erp-muted); }
+.erp-facts dd { margin: 0; }
+.erp-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+.erp-warn { color: var(--erp-bad); }
+
+/* Personal data never shows in clear: protects the screen share, the recording and vision frames. */
+.pii { filter: blur(6px); user-select: none; }
+
+.erp-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; background: var(--erp-card); border: 1px solid var(--erp-line); border-radius: 6px; padding: 16px; }
+.erp-fields label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--erp-muted); }
+.erp-fields label.wide { grid-column: 1 / -1; }
+.erp-fields input, .erp-fields select, .erp-fields textarea {
+  font: inherit; color: var(--erp-ink); padding: 8px 10px; border: 1px solid var(--erp-line); border-radius: 4px; background: #fff;
+}
+.erp-fields input:focus, .erp-fields select:focus, .erp-fields textarea:focus { outline: 2px solid var(--erp-accent); outline-offset: -1px; border-color: transparent; }
+
+.erp-blocked { border: 1px solid var(--erp-bad); background: var(--erp-bad-soft); color: var(--erp-bad); border-radius: 6px; padding: 12px 16px; }
+.erp-blocked ul { margin: 6px 0 0; padding-left: 18px; color: var(--erp-ink); }
+
+.erp-actions { display: flex; align-items: center; gap: 16px; }
+.erp-save { font: inherit; font-weight: 600; color: #fff; background: var(--erp-accent); border: 0; border-radius: 4px; padding: 10px 22px; cursor: pointer; }
+.erp-save:hover { background: #1d4ed8; }
+.erp-save:focus-visible { outline: 2px solid var(--erp-ink); outline-offset: 2px; }
+.erp-ok { color: var(--erp-ok); }
+.erp-gr { margin-left: auto; font-size: 12px; color: var(--erp-muted); }
