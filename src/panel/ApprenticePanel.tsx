@@ -55,6 +55,12 @@ function Panel() {
   const [gaps, setGaps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<string[]>([]);
+  const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
+  const [micId, setMicId] = useState("");
+  /** Off by default: the mic is muted while the agent talks, so background noise can't cut it off. */
+  const [allowInterrupt, setAllowInterrupt] = useState(false);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
+  const [debriefSecs, setDebriefSecs] = useState(0);
 
   const screen = useScreenRecorder();
   const startRef = useRef(Date.now());
@@ -89,10 +95,12 @@ function Panel() {
   };
 
   const conversation = useConversation({
+    micMuted: !allowInterrupt && agentSpeaking,
     onAgentToolRequest: (props) => note(`agent tool call: ${JSON.stringify(props).slice(0, 160)}`),
     onInterruption: () => note("agent was interrupted (mic picked up sound)"),
     onModeChange: ({ mode }) => {
       if (mode === "speaking") lastAgentSpeech.current = Date.now();
+      setAgentSpeaking(mode === "speaking");
       note(`agent ${mode}`);
       // In the debrief, send the gaps once the greeting has finished.
       if (phaseRef.current === "debrief") {
@@ -255,6 +263,7 @@ function Panel() {
       agentId: import.meta.env.VITE_INTERVIEWER_AGENT_ID,
       connectionType: "webrtc",
       dynamicVariables: { mode, expert_name: "Sabrina", agent_name: AGENT_NAME },
+      inputDeviceId: micId || undefined,
       // Prompts come from src/agents/prompts.ts (overrides are enabled in the agent's Security tab).
       overrides: {
         agent: {
@@ -304,7 +313,49 @@ function Panel() {
     }
   };
 
+  // Microphones. Labels only appear after mic permission, so "Find microphones" asks once.
+  const loadMics = async (ask: boolean) => {
+    try {
+      if (ask) (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach((t) => t.stop());
+      const inputs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+      setMics(inputs);
+    } catch (e) {
+      setError(`Could not list microphones: ${String(e)}`);
+    }
+  };
+  useEffect(() => {
+    loadMics(false);
+  }, []);
+  const chooseMic = (id: string) => {
+    setMicId(id);
+    if (connected) conv.current.changeInputDevice({ inputDeviceId: id }).catch((e) => note(`mic switch failed: ${e}`));
+  };
+
+  // Debrief clock: capped at 3:30. Nudge the agent to wrap up at 2:30 and to finish at 3:15.
+  useEffect(() => {
+    if (phase !== "debrief" || !connected) return;
+    const t0 = Date.now();
+    let wrapSent = false;
+    let endSent = false;
+    const id = setInterval(() => {
+      const secs = Math.floor((Date.now() - t0) / 1000);
+      setDebriefSecs(secs);
+      if (secs >= 150 && !wrapSent) {
+        wrapSent = true;
+        conv.current.sendUserMessage("[WRAP UP] One minute left. Skip any remaining questions. Do the teach-back now, under 30 seconds.");
+        note("debrief: wrap-up sent at 2:30");
+      }
+      if (secs >= 195 && !endSent) {
+        endSent = true;
+        conv.current.sendUserMessage("[TIME UP] Finish in one sentence and ask the expert to press Confirm.");
+        note("debrief: time-up sent at 3:15");
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, connected]);
+
   const startDebrief = () => {
+    setDebriefSecs(0);
     debriefStage.current = 0;
     debriefStartedAt.current = Date.now() - startRef.current;
     note("debrief started");
@@ -340,6 +391,36 @@ function Panel() {
   return (
     <div className="panel">
       <h2>Apprentice</h2>
+      <div className="row">
+        <label htmlFor="mic">Microphone</label>
+        <select id="mic" value={micId} onChange={(e) => chooseMic(e.target.value)}>
+          <option value="">System default</option>
+          {mics.map((m, i) => (
+            <option key={m.deviceId || i} value={m.deviceId}>
+              {m.label || `Microphone ${i + 1}`}
+            </option>
+          ))}
+        </select>
+        {mics.every((m) => !m.label) && (
+          <button type="button" onClick={() => loadMics(true)}>
+            Find microphones
+          </button>
+        )}
+        <label>
+          <input
+            id="allow-interrupt"
+            type="checkbox"
+            checked={allowInterrupt}
+            onChange={(e) => setAllowInterrupt(e.target.checked)}
+          />{" "}
+          Let me interrupt {AGENT_NAME}
+        </label>
+      </div>
+      {phase === "debrief" && (
+        <p className={debriefSecs >= 180 ? "error" : "muted"}>
+          Debrief {formatMs(debriefSecs * 1000)} / 03:30
+        </p>
+      )}
       <div className="row">
         {phase === "capture" &&
           (connected ? (

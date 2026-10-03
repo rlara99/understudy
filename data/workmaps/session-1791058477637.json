@@ -1,0 +1,60 @@
+{
+  "id": "session-1791058477637",
+  "workflow": "Supplier invoice processing",
+  "expert": "Sabrina M.",
+  "team": "Accounts payable",
+  "confirmed": false,
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Move INV-4471 to cost center 4711",
+      "moment": {
+        "t": "00:06",
+        "clip_s": 6.6
+      },
+      "decision": "Changed cost center from 0400 to 4711 and saved the posted invoice.",
+      "reason": "No reason given in the recording.",
+      "said_at": "",
+      "guardrails": []
+    },
+    {
+      "id": "s2",
+      "title": "Mark INV-4472 as done",
+      "moment": {
+        "t": "00:20",
+        "clip_s": 20.8
+      },
+      "decision": "Added the note 'Done' and saved the posted invoice with no other changes.",
+      "reason": "No reason given in the recording.",
+      "said_at": "",
+      "guardrails": []
+    },
+    {
+      "id": "s3",
+      "title": "Release INV-4473 from hold and post",
+      "moment": {
+        "t": "00:32",
+        "clip_s": 32.9
+      },
+      "decision": "Changed status from held to open, then to posted, and saved.",
+      "reason": "No reason given in the recording.",
+      "said_at": "",
+      "guardrails": []
+    },
+    {
+      "id": "s4",
+      "title": "Recode INV-4472 to cost center 4711",
+      "moment": {
+        "t": "00:53",
+        "clip_s": 53.9
+      },
+      "decision": "Reopened INV-4472 and changed cost center 0400 to 4711. Briefly tried 4712, returned to 4711, and saved.",
+      "reason": "When the d- destination is Stuttgart.",
+      "said_at": "00:52",
+      "guardrails": []
+    }
+  ],
+  "guardrails": [],
+  "open_questions": [],
+  "updated_at": "2026-10-03T20:16:19.437Z"
+}

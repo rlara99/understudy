@@ -1,0 +1,48 @@
+{
+  "id": "session-1791058237239",
+  "workflow": "Supplier invoice processing",
+  "expert": "Sabrina M.",
+  "team": "Accounts payable",
+  "confirmed": false,
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Recode cost center on INV-4471",
+      "moment": {
+        "t": "00:13",
+        "clip_s": 13.5
+      },
+      "decision": "Changed cost center from 4711 to 0400 and saved; status stayed posted.",
+      "reason": "",
+      "said_at": "",
+      "guardrails": []
+    },
+    {
+      "id": "s2",
+      "title": "Require second approval on INV-4472",
+      "moment": {
+        "t": "00:32",
+        "clip_s": 32.5
+      },
+      "decision": "Switched approval from single to second and saved; status stayed posted.",
+      "reason": "",
+      "said_at": "",
+      "guardrails": []
+    },
+    {
+      "id": "s3",
+      "title": "Keep INV-4473 on hold",
+      "moment": {
+        "t": "00:39",
+        "clip_s": 39
+      },
+      "decision": "Opened the invoice and saved it without changes; status stayed held.",
+      "reason": "",
+      "said_at": "",
+      "guardrails": []
+    }
+  ],
+  "guardrails": [],
+  "open_questions": [],
+  "updated_at": "2026-10-03T20:12:37.545Z"
+}
