@@ -20,7 +20,10 @@ export function ClipPlayer({ at, sessionId, leadIn = 2, autoPlay = true }: Props
 
   useEffect(() => {
     let objectUrl: string | null = null;
-    loadRecording(sessionId).then((blob) => {
+    // Fall back to the newest recording, e.g. for the hand-made sample map.
+    loadRecording(sessionId)
+      .then((blob) => blob ?? (sessionId ? loadRecording() : null))
+      .then((blob) => {
       if (!blob) return setMissing(true);
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);

@@ -6,6 +6,8 @@ import { getJson } from "../shared/api";
 import { publishErpEvent } from "../shared/bus";
 import { violatedGuardrails } from "../shared/guardrails";
 import type { ErpEvent, Guardrail, Invoice, WorkMap } from "../shared/types";
+import { MasteryPanel } from "../screens/MasteryPanel";
+import { recordBlocked, recordSaved, resetProgress } from "../screens/progress";
 import "./erp.css";
 
 type Mode = "capture" | "teach";
@@ -56,6 +58,7 @@ export function resetErp() {
   } catch {
     /* nothing stored */
   }
+  resetProgress();
 }
 
 /** Newest confirmed real map wins; the hand-made sample is the fallback. */
@@ -146,11 +149,13 @@ export function ErpPage({ mode }: { mode: Mode }) {
     const broken = mode === "teach" && map ? violatedGuardrails(target, map.guardrails) : [];
     if (broken.length) {
       broken.forEach((g) => publish({ type: "guardrail_blocked", invoice: draft.id, field: g.id, note: g.text }));
+      recordBlocked(draft.id, broken.map((g) => g.id));
       setBlocked(broken);
       return;
     }
 
     publish({ type: "save", invoice: draft.id, field: "status", from: before.status, to: target.status });
+    if (mode === "teach") recordSaved(target);
     const next = invoices.map((i) => (i.id === target.id ? target : i));
     setInvoices(next);
     writeEdits(mode, next);
@@ -182,6 +187,7 @@ export function ErpPage({ mode }: { mode: Mode }) {
               <span className="erp-row-amt">{money(inv.amount, inv.currency)}</span>
             </button>
           ))}
+          {mode === "teach" && map && <MasteryPanel map={map} />}
         </aside>
 
         <section className="erp-detail">
