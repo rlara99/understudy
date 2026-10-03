@@ -1,7 +1,7 @@
 // Owner: Renzo. Voice side panel for the expert (Interviewer agent).
 // Flow: Start capture (share screen + live questions) -> Finish task (draft Work Map + gaps)
 //       -> Start debrief (gaps, then teach-back) -> Confirm Work Map.
-// Open the ERP in another tab; its events arrive here over BroadcastChannel.
+// The work app (ERP) is a separate app; its events arrive here over the API relay (src/shared/bus.ts).
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
 import { IMPORTANT_FIELDS, PauseDetector } from "../agents/pauseRule";

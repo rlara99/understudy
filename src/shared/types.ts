@@ -1,6 +1,6 @@
 // SHARED FILE: Renzo + Pablo agree before changing anything here, then push right away.
 
-/** Something that happened in the fake ERP, sent over BroadcastChannel "erp". */
+/** Something that happened in the work app (ERP), sent over the relay channel "erp" (src/shared/bus.ts). */
 export type ErpEventType =
   | "invoice_opened"
   | "field_change"

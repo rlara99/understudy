@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "concurrently -k -n web,api -c blue,green \"vite\" \"tsx watch server/index.ts\"",
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit && vite build"
+    "build": "tsc --noEmit && vite build",
+    "desktop": "concurrently -k -n web,api,app -c blue,green,magenta \"vite\" \"tsx watch server/index.ts\" \"wait-on http-get://localhost:5173 tcp:8787 && electron .\"",
+    "desktop:app": "electron ."
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -24,8 +26,11 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
+    "electron": "^44.5.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2"
-  }
+    "vite": "^8.3.2",
+    "wait-on": "^9.5.1"
+  },
+  "main": "desktop/main.cjs"
 }

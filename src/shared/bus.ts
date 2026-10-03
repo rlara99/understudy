@@ -1,20 +1,18 @@
-// SHARED FILE: the ERP tab publishes, the apprentice panel subscribes.
-// BroadcastChannel works across tabs of the same origin (localhost:5173).
+// SHARED FILE: the work app (ERP) publishes, Understudy (panels) subscribes.
+// Goes through the API server's relay, so the ERP can be a separate app in any browser
+// while Understudy runs in Electron.
+import { publish, subscribe } from "./relay";
 import type { ErpEvent } from "./types";
 
 const CHANNEL = "erp";
-let sender: BroadcastChannel | null = null;
 
 export function publishErpEvent(event: ErpEvent): void {
-  sender ??= new BroadcastChannel(CHANNEL);
-  sender.postMessage(event);
+  publish(CHANNEL, event);
 }
 
 /** Returns an unsubscribe function. */
 export function onErpEvent(handler: (event: ErpEvent) => void): () => void {
-  const channel = new BroadcastChannel(CHANNEL);
-  channel.onmessage = (msg: MessageEvent<ErpEvent>) => handler(msg.data);
-  return () => channel.close();
+  return subscribe<ErpEvent>(CHANNEL, handler);
 }
 
 /** "mm:ss" for a millisecond offset. */

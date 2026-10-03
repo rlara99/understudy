@@ -34,8 +34,15 @@ Electron app in this repo (`desktop/`), wrapping the same React app and server. 
 | Learner | **Expert Minute** | My questions + status/answers; submit a new question | Open questions + `POST /api/questions` | Pablo (UI), Renzo (route) |
 
 - Shell: left sidebar with an Expert/Learner switch and the three modules of each mode; simple, modern (Pablo). Builds and runs in the browser at :5173 too; Electron just loads it.
-- Electron main (`desktop/main.cjs`, Renzo): main window + a small always-on-top **companion** window (Claudia status, mic, off the record) so the expert can work in other apps. Screen capture through `setDisplayMediaRequestHandler` with Windows `loopback` system audio (call audio, opt-in). Preload exposes `window.understudy` (`isDesktop`, `openCompanion()`, `closeCompanion()`).
+- **The ERP is NOT part of Understudy.** It is a separate work app (owned and built by Pablo) that the expert/learner uses in a normal browser, like a real SAP/Excel. Understudy's nav has no ERP. The ERP talks to Understudy only through the API relay (below), so it can live on its own page, port or project.
+- **Relay between apps** (`server/routes/relay.ts`, `src/shared/relay.ts`, Renzo): `POST /api/relay/:channel` delivers a JSON message to every listener of `GET /api/relay/:channel` (Server-Sent Events). `publish(channel, msg)` / `subscribe(channel, fn)` in `src/shared/relay.ts`. CORS allows any `http://localhost:*` origin; an app on another port sets `VITE_API_BASE=http://localhost:8787`. Tested direct and through the Vite proxy.
+  - Channel `erp`: `publishErpEvent` / `onErpEvent` in `src/shared/bus.ts` now use the relay (same API as before, no caller changes).
+  - Channel for capture control (off the record sync): `src/capture/control.ts` still uses BroadcastChannel and must move to `publish`/`subscribe` (Pablo, a 2-line swap) so the separate ERP's Off-the-record button keeps working.
+- Electron (`desktop/`, Renzo): `main.cjs` opens the main window + a small always-on-top **companion** window for live sessions (Claudia status, mic, off the record) so people can work in other apps. Screen capture via `setDisplayMediaRequestHandler` (primary screen) with Windows `loopback` system audio when the page requests audio (call audio, opt-in). `preload.cjs` exposes `window.understudy` (`isDesktop`, `openCompanion(route)`, `closeCompanion()`, `focusMain()`). Use `openSession(route)` / `closeSession()` from `src/shared/desktop.ts` (falls back to same-tab navigation in a browser). Session routes: `work/live`, `work/record`, `learner/assistant`.
+- Run the desktop app: `npm run desktop` (Vite + API + Electron; Vite has `strictPort: true` because Electron loads :5173). `npm run dev` still runs the web version only. Kill leftover node/electron processes if :5173 is taken.
 - Needs `ELEVENLABS_API_KEY` in `.env` (server-side, Speech to Text) for record-and-learn transcription.
+
+**Pablo, next:** pull; build the ERP as its own app (own entry/page, not in Understudy's nav), sending events with `publishErpEvent`; swap `control.ts` to the relay; build the shell, Knowledge Repository and both Expert Minute screens, starting sessions with `openSession(...)`.
 
 ## Run
 
