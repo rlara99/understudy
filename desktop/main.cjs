@@ -104,6 +104,14 @@ app.whenReady().then(() => {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   });
+  // Bring the main window forward on a route, e.g. "expert/debrief".
+  ipcMain.handle("main:navigate", (_e, route) => {
+    if (!mainWindow) createMainWindow();
+    mainWindow.webContents.executeJavaScript(`location.hash = ${JSON.stringify("#/" + String(route || ""))}`);
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
 
   // External links open in the browser, not inside the app.
   app.on("web-contents-created", (_e, contents) => {

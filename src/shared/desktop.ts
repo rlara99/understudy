@@ -8,6 +8,7 @@ interface UnderstudyBridge {
   openCompanion(route: string): Promise<void>;
   closeCompanion(): Promise<void>;
   focusMain(): Promise<void>;
+  showInMain?(route: string): Promise<void>;
 }
 
 declare global {
@@ -34,9 +35,11 @@ export function openSession(route: string): void {
 
 /** Close the companion (desktop) or go back to the main app (browser). */
 export function closeSession(fallbackRoute = ""): void {
-  if (window.understudy) {
-    window.understudy.focusMain();
-    window.understudy.closeCompanion();
+  const bridge = window.understudy;
+  if (bridge) {
+    if (fallbackRoute && bridge.showInMain) bridge.showInMain(fallbackRoute);
+    else bridge.focusMain();
+    bridge.closeCompanion();
   } else location.hash = `#/${fallbackRoute}`;
 }
 

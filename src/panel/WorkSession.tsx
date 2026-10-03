@@ -76,6 +76,10 @@ function Session({ mode }: { mode: Mode }) {
   const zero = useRef(Date.now());
   const logRef = useRef(log);
   logRef.current = log;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  /** Latest finish(), for the spoken "let's debrief" command inside the conversation callbacks. */
+  const finishRef = useRef<((goToDebrief?: boolean) => Promise<void>) | null>(null);
   const offRef = useRef(screen.offRecord);
   offRef.current = screen.offRecord;
   const pause = useRef(new PauseDetector());
@@ -118,6 +122,12 @@ function Session({ mode }: { mode: Mode }) {
       } else {
         if (/\boff the record\b/i.test(message) && !/\bback on\b/i.test(message)) {
           screen.setOffRecord(true);
+          return;
+        }
+        // "Let's debrief": save this session and open Debrief & teach in the main window.
+        if (/\bdebrief(ing)?\b/i.test(message)) {
+          note("debrief requested by voice");
+          finishRef.current?.(true);
           return;
         }
         pause.current.activity();
@@ -304,14 +314,19 @@ function Session({ mode }: { mode: Mode }) {
     }
   };
 
-  const finish = async () => {
+  const finish = async (goToDebrief = false) => {
+    if (phaseRef.current !== "running") return;
     setPhase("saving");
+    phaseRef.current = "saving";
     if (connected) conversation.endSession();
     const transcript = live ? logRef.current.transcript : await audio.stop();
     const spans = screen.offRecordSpans();
     await screen.stop();
     const l = logRef.current;
-    const apps = [...new Set(l.events.map((e) => (e.type === "screen" ? e.app : "ERP")).filter(Boolean))];
+    // Short app names for the title (vision can return long descriptions).
+    const apps = [
+      ...new Set(l.events.map((e) => (e.type === "screen" ? (e.app ?? "").split(/[(,·-]/)[0].trim().slice(0, 20) : "ERP")).filter(Boolean)),
+    ].slice(0, 3);
     const tasks = l.events.filter((e) => e.type === "save" || (e.type === "screen" && e.note?.includes("finished:"))).length;
     try {
       await putJson(`/api/sessions/${l.id}`, {
@@ -322,11 +337,13 @@ function Session({ mode }: { mode: Mode }) {
         title: `${live ? "Live" : "Record & learn"} · ${apps.join(", ") || "screen"}${tasks ? ` · ${tasks} task${tasks > 1 ? "s" : ""}` : ""}`,
       } satisfies SessionLog);
       setPhase("saved");
+      if (goToDebrief) closeSession("expert/debrief");
     } catch (e) {
       setError(`Could not save the session: ${String(e)}`);
       setPhase("running");
     }
   };
+  finishRef.current = finish;
 
   const transcript = live ? log.transcript : audio.lines;
 
@@ -392,7 +409,7 @@ function Session({ mode }: { mode: Mode }) {
             <button type="button" className={screen.offRecord ? "ws-primary" : ""} onClick={() => screen.setOffRecord(!screen.offRecord)}>
               {screen.offRecord ? "Back on the record" : "Off the record"}
             </button>
-            <button type="button" onClick={finish}>
+            <button type="button" onClick={() => finish()}>
               Finish
             </button>
           </div>

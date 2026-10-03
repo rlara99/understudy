@@ -54,6 +54,7 @@ Compare with the previous description and report:
 - changes: one short line per meaningful change since the previous description ("invoice 4471 opened", "cost center changed 4711 -> 0400", "email to controller drafted"). Empty if nothing meaningful changed. Ignore cursor moves and scrolling.
 - task_done: if the worker just finished a unit of work (saved, sent, submitted, posted, closed a case), a one-line summary of it; else null.
 - judgment_call: if a change looks like a decision an expert would make for a reason the screen doesn't show (a recode, a hold, an escalation, an exception, an override), one line naming it; else null.
+Ignore the Understudy / Claudia assistant window itself (a small panel with a transcript and \"Off the record\"/\"Finish\" buttons): it is not the work.
 Never transcribe IBANs, account numbers, personal names, emails or phone numbers.`,
     messages: [
       {

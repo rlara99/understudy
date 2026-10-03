@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld("understudy", {
   closeCompanion: () => ipcRenderer.invoke("companion:close"),
   /** Bring the main window back to the front. */
   focusMain: () => ipcRenderer.invoke("main:focus"),
+  /** Bring the main window forward and switch it to a route, e.g. "expert/debrief". */
+  showInMain: (route) => ipcRenderer.invoke("main:navigate", route),
 });
