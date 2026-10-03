@@ -143,17 +143,47 @@ function Panel() {
   const conv = useRef(conversation);
   conv.current = conversation;
 
-  // ERP events -> agent context (silent) + pause detector
+  // Changes per invoice that the agent hasn't asked about yet, and a queued "task done" nudge.
+  const changesByInvoice = useRef(new Map<string, string[]>());
+  const currentInvoice = useRef<string | null>(null);
+  const pendingTaskDone = useRef<string | null>(null);
+
+  /** The expert finished an invoice: hand its changes to the agent, which decides ask vs. acknowledge. */
+  const taskDone = (invoice: string) => {
+    const changes = changesByInvoice.current.get(invoice) ?? [];
+    changesByInvoice.current.delete(invoice);
+    pause.current.forget(invoice);
+    if (changes.length === 0) return;
+    pendingTaskDone.current = `[TASK DONE] The expert finished ${invoice}. Changes they made: ${changes.join("; ")}.`;
+  };
+
+  // ERP events -> agent context (silent) + task tracking
   useEffect(() => {
     const record = (e: ErpEvent) => {
       setLog((l) => ({ ...l, events: [...l.events, e] }));
       if (!connected || phaseRef.current !== "capture") return;
       conv.current.sendContextualUpdate(`[SCREEN] ${formatMs(e.t)} ${describe(e)}`);
-      if (e.type === "field_change") pause.current.decision(describe(e), IMPORTANT_FIELDS.has(String(e.field)));
+      if (e.type === "field_change") {
+        const list = changesByInvoice.current.get(e.invoice) ?? [];
+        changesByInvoice.current.set(e.invoice, [...list, describe(e)]);
+        pause.current.decision(describe(e), IMPORTANT_FIELDS.has(String(e.field)));
+      } else if (e.type === "save") {
+        taskDone(e.invoice);
+      } else if (e.type === "invoice_opened") {
+        // Moving to another invoice also counts as finishing the previous one.
+        if (currentInvoice.current && currentInvoice.current !== e.invoice) taskDone(currentInvoice.current);
+        currentInvoice.current = e.invoice;
+      }
     };
-    // Merge rapid field_change events per field into one change. (The ERP now sends one per
-    // field on blur, so this rarely triggers; kept as a safety net.)
+    // Merge rapid field_change events per field into one change (safety net; the ERP sends on blur).
     const pending = new Map<string, { event: ErpEvent; timer: ReturnType<typeof setTimeout> }>();
+    const flush = () => {
+      pending.forEach((p, key) => {
+        clearTimeout(p.timer);
+        pending.delete(key);
+        if (p.event.from !== p.event.to) record(p.event);
+      });
+    };
     const unsubscribe = onErpEvent((raw) => {
       const e = { ...raw, t: raw.t - startRef.current };
       if (e.type === "keystroke") {
@@ -170,10 +200,11 @@ function Panel() {
         const timer = setTimeout(() => {
           pending.delete(key);
           if (event.from !== event.to) record(event);
-        }, 700);
+        }, 150);
         pending.set(key, { event, timer });
         return;
       }
+      flush(); // a save right after an edit must see that edit first
       record(e);
     });
     return () => {
@@ -182,24 +213,40 @@ function Panel() {
     };
   }, [connected]);
 
-  // Pause check: nudge one question when the expert pauses after a decision (capture only)
+  /** Send a nudge; if the agent stays silent for 5 s, resend once. */
+  const sendNudge = (nudge: string, label: string, resend: boolean) => {
+    const sentAt = Date.now();
+    conv.current.sendUserMessage(nudge);
+    note(label);
+    if (!resend) return;
+    setTimeout(() => {
+      if (lastAgentSpeech.current >= sentAt || conv.current.status !== "connected") return;
+      conv.current.sendUserMessage(nudge);
+      note("no answer after 5 s: resent once");
+    }, 5000);
+  };
+
+  // Every 300 ms: a finished task goes first; otherwise a mid-task question after a real pause.
   useEffect(() => {
     if (!connected || phase !== "capture") return;
     const id = setInterval(() => {
-      const decision = pause.current.check(conv.current.isSpeaking);
+      if (conv.current.isSpeaking) return;
+      if (pendingTaskDone.current) {
+        const nudge = pendingTaskDone.current;
+        pendingTaskDone.current = null;
+        pause.current.countAsked();
+        sendNudge(nudge, `task done nudge: ${nudge.slice(12, 120)}`, true);
+        return;
+      }
+      const decision = pause.current.check(false);
       if (!decision) return;
       pause.current.markAsked(decision);
-      const nudge = `[PAUSE] Ask one question about: ${decision}`;
-      const sentAt = Date.now();
-      conv.current.sendUserMessage(nudge);
-      note(`pause nudge sent: ${decision}`);
-      // Safety net: if the agent stays silent, resend once.
-      setTimeout(() => {
-        if (lastAgentSpeech.current >= sentAt || conv.current.status !== "connected") return;
-        conv.current.sendUserMessage(nudge);
-        note("no answer to the nudge after 5 s: resent once");
-      }, 5000);
-    }, 500);
+      // Don't repeat this one when the task is done.
+      changesByInvoice.current.forEach((list, inv) =>
+        changesByInvoice.current.set(inv, list.filter((c) => c !== decision)),
+      );
+      sendNudge(`[PAUSE] The expert paused mid-task after: ${decision}`, `pause nudge: ${decision}`, false);
+    }, 300);
     return () => clearInterval(id);
   }, [connected, phase]);
 

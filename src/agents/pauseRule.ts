@@ -1,6 +1,6 @@
-// Owner: Renzo. Decides when the interviewer may ask one question.
-// Important decisions (see IMPORTANT_FIELDS) are asked at the first short gap in typing,
-// even if the expert has moved on. Minor ones wait for a real pause. Never mid-typing.
+// Owner: Renzo. Decides when the interviewer may ask a question in the MIDDLE of a task.
+// The main trigger is "task done" (invoice saved or left), handled in the panel.
+// Mid-task, only important decisions (see IMPORTANT_FIELDS) are asked, after a real pause.
 
 export const IMPORTANT_FIELDS = new Set(["cost_center", "approval", "status"]);
 
@@ -30,10 +30,10 @@ export class PauseDetector {
 
   constructor(
     private opts: PauseRuleOptions = {
-      idleMs: 1500,
-      urgentIdleMs: 800,
+      idleMs: 6000,
+      urgentIdleMs: 2500,
       decisionWindowMs: 45000,
-      maxQuestions: 5,
+      maxQuestions: 8,
       minGapMs: 8000,
     },
   ) {}
@@ -62,6 +62,17 @@ export class PauseDetector {
     const quiet = now - this.lastActivity;
     if (quiet < (next.important ? o.urgentIdleMs : o.idleMs)) return null;
     return next.summary;
+  }
+
+  /** Drop pending decisions for an invoice (its task-done nudge covers them). */
+  forget(invoice: string): void {
+    this.queue = this.queue.filter((p) => !p.summary.includes(invoice));
+  }
+
+  /** Count a question asked outside check() (e.g. a task-done nudge). */
+  countAsked(now = Date.now()): void {
+    this.asked += 1;
+    this.lastAsked = now;
   }
 
   markAsked(summary: string, now = Date.now()): void {
