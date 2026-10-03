@@ -36,8 +36,15 @@ function Panel() {
   }));
   const startRef = useRef(Date.now());
   const pause = useRef(new PauseDetector());
+  const [debug, setDebug] = useState<string[]>([]);
+  const note = (text: string) =>
+    setDebug((d) => [...d.slice(-40), `${formatMs(Date.now() - startRef.current)} ${text}`]);
 
   const conversation = useConversation({
+    onAgentToolRequest: (props) => note(`agent tool call: ${JSON.stringify(props).slice(0, 160)}`),
+    onInterruption: () => note("agent was interrupted (mic picked up sound)"),
+    onModeChange: ({ mode }) => note(`agent ${mode}`),
+    onDisconnect: (details) => note(`disconnected: ${JSON.stringify(details).slice(0, 160)}`),
     onMessage: ({ message, role }) => {
       const line: TranscriptLine = {
         t: Date.now() - startRef.current,
@@ -50,7 +57,10 @@ function Panel() {
     onVadScore: ({ vadScore }) => {
       if (vadScore > 0.6) pause.current.activity();
     },
-    onError: (message) => console.error("ElevenLabs error:", message),
+    onError: (message) => {
+      console.error("ElevenLabs error:", message);
+      note(`error: ${String(message)}`);
+    },
   });
   const connected = conversation.status === "connected";
   // Effects read the latest hook value through a ref so they don't resubscribe on every render.
@@ -81,6 +91,7 @@ function Panel() {
       if (!decision) return;
       pause.current.markAsked();
       conv.current.sendUserMessage(`[PAUSE] Ask one question about: ${decision}`);
+      note(`pause nudge sent: ${decision}`);
     }, 500);
     return () => clearInterval(id);
   }, [connected, mode]);
@@ -113,9 +124,17 @@ function Panel() {
         <button onClick={save}>Save session</button>
       </div>
       <p className="muted">
-        Status: {conversation.status} · {conversation.isSpeaking ? "agent speaking" : "listening"} · questions asked:{" "}
-        {pause.current.asked}
+        Status: {conversation.status} · {conversation.isSpeaking ? "agent speaking" : "listening"} · pause nudges
+        sent: {pause.current.asked}
       </p>
+      <h3>Debug</h3>
+      <ul className="log">
+        {debug.map((d, i) => (
+          <li key={i} className="muted">
+            {d}
+          </li>
+        ))}
+      </ul>
       <h3>Transcript</h3>
       <ul className="log">
         {log.transcript.map((l, i) => (
