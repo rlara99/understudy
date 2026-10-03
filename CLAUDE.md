@@ -19,6 +19,24 @@ All three required modules and the Gap Loop work end to end and were tested live
 
 **Still to do:** clean full run after **Reset demo** (also the first end-to-end test of the 3:30 debrief), backup demo video (Pablo), pitch slides with the 5 Apprentice Test answers and a moonshot slide. Optional stretch: "Export for agents" (Work Map → agent instructions).
 
+## Desktop app (in progress)
+
+Electron app in this repo (`desktop/`), wrapping the same React app and server. Two modes, three modules each:
+
+| Mode | Module | What it does | Built from | Owner |
+|---|---|---|---|---|
+| Expert | **Work mode: live** | Claudia watches any app (vision frames) or the ERP (exact events), asks at the right moments; off the record | Apprentice panel capture + `/api/frame` | Renzo |
+| Expert | **Work mode: record and learn** | Silent: records screen + mic + (opt-in) call audio, transcribes, no questions | Recorder + ElevenLabs speech-to-text | Renzo |
+| Expert | **Debrief and teach** | 5-minute spoken debrief over the day's recordings → confirmed Work Map | Debrief flow, multi-session `/api/map` | Renzo |
+| Expert | **Expert Minute** | Answer learners' open questions by voice | Inbox + Quick Ask | Pablo (UI), Renzo (voice) |
+| Learner | **Assistant** | Live tips while working; learner can ask anything; unknowns become gap questions | Tutor panel | Renzo |
+| Learner | **Knowledge Repository** | Tasks with walkthrough videos (step clips in sequence) | Library + Work Map + ClipPlayer | Pablo |
+| Learner | **Expert Minute** | My questions + status/answers; submit a new question | Open questions + `POST /api/questions` | Pablo (UI), Renzo (route) |
+
+- Shell: left sidebar with an Expert/Learner switch and the three modules of each mode; simple, modern (Pablo). Builds and runs in the browser at :5173 too; Electron just loads it.
+- Electron main (`desktop/main.cjs`, Renzo): main window + a small always-on-top **companion** window (Claudia status, mic, off the record) so the expert can work in other apps. Screen capture through `setDisplayMediaRequestHandler` with Windows `loopback` system audio (call audio, opt-in). Preload exposes `window.understudy` (`isDesktop`, `openCompanion()`, `closeCompanion()`).
+- Needs `ELEVENLABS_API_KEY` in `.env` (server-side, Speech to Text) for record-and-learn transcription.
+
 ## Run
 
 ```
