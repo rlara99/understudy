@@ -9,14 +9,14 @@ import { resetProgressView } from "./progress";
 /**
  * Tells the separate ERP app to restore its seed invoices and clear the trainee's progress
  * (relay message), clears stored recordings, and puts the sample Work Map back the way it was
- * committed (undoing Quick Ask patches). Work Maps created by capture sessions are kept.
+ * committed (undoing Quick Ask patches and learner questions on it). Work Maps created by
+ * capture sessions are kept.
  */
 export async function resetDemo() {
   postControl({ kind: "reset" });
   resetProgressView();
   try {
     localStorage.removeItem("understudy.quickAsk");
-    localStorage.removeItem("understudy.myQuestions");
   } catch {
     /* nothing stored */
   }

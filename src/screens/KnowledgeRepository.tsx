@@ -208,7 +208,7 @@ export function KnowledgeTask({ id }: { id: string }) {
               <ClipPlayer
                 key={step.id}
                 at={step.moment.clip_s}
-                sessionId={map.sample ? undefined : map.id}
+                sessionId={step.moment.session ?? (map.sample ? undefined : map.id)}
                 autoPlay={playingAll || index > 0}
                 onClipEnd={() => playingAll && next()}
                 onAvailable={setHasVideo}

@@ -2,12 +2,13 @@
 // mode's modules. Same UI in the browser (localhost:5173) and inside the Electron window.
 // Live sessions (work/live, work/record, learner/assistant, panel) start through openSession():
 // a small always-on-top companion window on desktop, this tab in a browser.
+// The session routes are Renzo's and render bare (no sidebar): they're sized for the 420 px companion.
 import { useEffect, useState, type ReactNode } from "react";
 import { ApprenticePanel } from "../panel/ApprenticePanel";
+import { DebriefModule } from "../panel/DebriefModule";
 import { TutorPanel } from "../panel/TutorPanel";
+import { WorkSession } from "../panel/WorkSession";
 import { inCompanion, isDesktop, openSession, SESSION_ROUTES } from "../shared/desktop";
-import { getJson } from "../shared/api";
-import type { WorkMap } from "../shared/types";
 import { InboxScreen } from "../screens/InboxScreen";
 import { KnowledgeRepository, KnowledgeTask } from "../screens/KnowledgeRepository";
 import { LearnerMinute } from "../screens/LearnerMinute";
@@ -139,9 +140,23 @@ export function Shell() {
     if (!route) location.replace(`#/${MODULES[storedMode()][0].routes[0]}`);
   }, [route]);
 
+  // Live sessions run bare (Renzo's layout for the companion window), in a browser too.
+  if (route === SESSION_ROUTES.workLive || route === SESSION_ROUTES.workRecord)
+    return (
+      <main className="session-main">
+        <WorkSession key={route} mode={route === SESSION_ROUTES.workRecord ? "record" : "live"} />
+      </main>
+    );
+  if (route === SESSION_ROUTES.assistant)
+    return (
+      <main className="session-main">
+        <TutorPanel />
+      </main>
+    );
+
   const body = renderRoute(route);
   // The desktop companion window is small: just the session, no sidebar.
-  if (inCompanion()) return <main className="companion">{body}</main>;
+  if (inCompanion()) return <main className="session-main">{body}</main>;
 
   const active = MODULES[mode].find((m) => m.routes.some((r) => startsWith(route, r)));
 
@@ -197,15 +212,14 @@ function renderRoute(route: string): ReactNode {
   const [a, b, c] = route.split("/");
   const r = b ? `${a}/${b}` : a;
 
-  // Sessions (companion window on desktop)
-  if (r === SESSION_ROUTES.workLive || r === SESSION_ROUTES.quickAsk) return <ApprenticePanel />;
-  if (r === SESSION_ROUTES.assistant || r === "tutor") return <TutorPanel />;
-  if (r === SESSION_ROUTES.workRecord) return <ComingSoon title="Work mode: record and learn" />;
+  // Quick Ask from the Expert Minute inbox (ApprenticePanel in quick_ask mode)
+  if (r === SESSION_ROUTES.quickAsk) return <ApprenticePanel />;
+  if (r === "tutor") return <TutorPanel />;
 
   // Expert
   if (r === "expert/live") return <LiveLauncher />;
   if (r === "expert/record") return <RecordLauncher />;
-  if (r === "expert/debrief") return <DebriefHome />;
+  if (r === "expert/debrief") return <DebriefModule />;
   if (r === "library") return <LibraryScreen />;
   if (r === "expert/minute" || r === "inbox") return <InboxScreen />;
   if (a === "map" && b) return <WorkMapScreen id={b} />;
@@ -310,73 +324,6 @@ function AssistantLauncher() {
       erpHref={`${ERP_URL}#/teach`}
       erpLabel="Open the ERP as Lena ↗"
     />
-  );
-}
-
-function DebriefHome() {
-  const [maps, setMaps] = useState<WorkMap[] | null>(null);
-  useEffect(() => {
-    getJson<WorkMap[]>("/api/workmaps").then(setMaps).catch(() => setMaps([]));
-  }, []);
-  const sorted = [...(maps ?? [])].sort((a, b) => Number(a.confirmed) - Number(b.confirmed) || b.updated_at.localeCompare(a.updated_at));
-  return (
-    <div className="screen">
-      <header className="wm-head">
-        <div>
-          <h2>Debrief and teach</h2>
-          <p>Your Work Maps. Drafts need a short spoken debrief before new hires learn from them.</p>
-        </div>
-      </header>
-      <div className="note-card">
-        Today a debrief runs at the end of a live session: <b>Finish task → Start debrief → Confirm</b>. A debrief over a whole day of recordings is
-        coming next.
-      </div>
-      {maps === null ? (
-        <p className="muted">Loading…</p>
-      ) : (
-        <ul className="cards">
-          {sorted.map((m) => {
-            const open = m.open_questions.filter((q) => q.status === "open").length;
-            return (
-              <li key={m.id}>
-                <a className="card lib-card" href={`#/map/${m.id}`}>
-                  <span className="lib-pills">
-                    <span className={`pill ${m.confirmed ? "ok" : "line"}`}>{m.confirmed ? "Confirmed" : "Needs debrief"}</span>
-                    {open > 0 && <span className="pill gap">{open} open</span>}
-                    {m.sample && <span className="pill line">Sample</span>}
-                  </span>
-                  <b className="lib-name">{m.workflow}</b>
-                  <span className="muted small">
-                    {m.expert} · updated {new Date(m.updated_at).toLocaleDateString()}
-                  </span>
-                  <span className="mono small">
-                    {m.steps.length} steps · {m.guardrails.length} rules
-                  </span>
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <p className="muted small">
-        Coverage and new-hire mastery for every map: <a href="#/library">Know-how overview</a>.
-      </p>
-    </div>
-  );
-}
-
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <div className="screen launcher">
-      <div className="launch-card">
-        <span className="eyebrow">In progress</span>
-        <h2>{title}</h2>
-        <p className="lede">This session is being built. Use Work mode: live in the meantime.</p>
-        <a className="btn" href="#/expert/live">
-          Go to Work mode: live
-        </a>
-      </div>
-    </div>
   );
 }
 

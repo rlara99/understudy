@@ -1,127 +1,63 @@
 // Owner: Pablo. Learner › Expert Minute: ask the experts something no task covers yet,
 // and follow your questions until an expert answers. Route: #/learner/minute.
-//
-// Submitting uses POST /api/questions when the server has it (Renzo). Until then it does
-// what the tutor's flag_open_question does: /api/route (picks the expert, merges duplicates)
-// and then saves the question into the task's Work Map.
+// Server (Renzo): POST /api/questions routes the question, merges duplicates and records the
+// asker; GET /api/questions?asker=<name> lists that learner's questions. Experts never see names.
 import { useEffect, useState } from "react";
-import { getJson, postJson, putJson } from "../shared/api";
+import { LEARNER } from "../panel/TutorPanel";
+import { getJson, postJson } from "../shared/api";
 import type { OpenQuestion, WorkMap } from "../shared/types";
 import "./screens.css";
 
-const MINE_KEY = "understudy.myQuestions";
+type Listed = OpenQuestion & { map_id: string; workflow: string };
 
-interface Mine {
-  workmapId: string;
-  questionId: string;
-  asked_at: number;
-}
-
-type Answered = OpenQuestion & { answer_clean?: string };
-
-function readMine(): Mine[] {
-  try {
-    return JSON.parse(localStorage.getItem(MINE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function addMine(m: Mine) {
-  try {
-    localStorage.setItem(MINE_KEY, JSON.stringify([m, ...readMine().filter((x) => x.questionId !== m.questionId)]));
-  } catch {
-    /* storage blocked: the question is still saved on the server */
-  }
-}
-
-/** Newest confirmed real map wins; the sample is the fallback (same rule as the ERP and tutor). */
-function pickMap(maps: WorkMap[]): WorkMap | null {
-  const byDate = [...maps].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  return byDate.find((m) => !m.sample && m.confirmed) ?? byDate.find((m) => !m.sample) ?? byDate[0] ?? null;
-}
-
-async function submitQuestion(question: string, context: string | undefined, workmapId: string): Promise<Mine> {
-  // Preferred: the server route, once it exists.
-  try {
-    const res = await postJson<{ workmapId: string; question: OpenQuestion }>("/api/questions", { question, context, workmapId });
-    return { workmapId: res.workmapId, questionId: res.question.id, asked_at: Date.now() };
-  } catch (err) {
-    if (!/\b404\b/.test(String(err))) throw err;
-  }
-  // Fallback: route it and save it into the map ourselves.
-  const map = await getJson<WorkMap>(`/api/workmaps/${workmapId}`);
-  const open = map.open_questions.filter((q) => q.status === "open");
-  const routed = await postJson<{ expert_name: string; reason: string; neutral_question: string; duplicate_of: string | null }>(
-    "/api/route",
-    { question, context, open: open.map((q) => ({ id: q.id, q: q.q })) },
-  );
-  let id: string;
-  const same = open.find((q) => q.id === routed.duplicate_of);
-  if (same) {
-    same.asked_by_count += 1;
-    id = same.id;
-  } else {
-    id = `q-${Date.now()}`;
-    map.open_questions.push({
-      id,
-      q: routed.neutral_question,
-      context,
-      asked_by_count: 1,
-      route_to: routed.expert_name,
-      route_reason: routed.reason,
-      status: "open",
-    });
-  }
-  await putJson(`/api/workmaps/${map.id}`, map);
-  return { workmapId: map.id, questionId: id, asked_at: Date.now() };
+interface Posted {
+  question: OpenQuestion;
+  map_id: string;
+  workflow: string;
+  merged: boolean;
 }
 
 export function LearnerMinute() {
   const [maps, setMaps] = useState<WorkMap[]>([]);
-  const [mine, setMine] = useState<Mine[]>(readMine);
+  const [mine, setMine] = useState<Listed[] | null>(null);
+  const [all, setAll] = useState<Listed[]>([]);
   const [question, setQuestion] = useState("");
   const [context, setContext] = useState("");
   const [task, setTask] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [sent, setSent] = useState<Posted | null>(null);
 
+  const load = () => {
+    getJson<Listed[]>(`/api/questions?asker=${encodeURIComponent(LEARNER)}`).then(setMine).catch(() => setMine((m) => m ?? []));
+    getJson<Listed[]>("/api/questions").then(setAll).catch(() => {});
+  };
   useEffect(() => {
-    const load = () => getJson<WorkMap[]>("/api/workmaps").then(setMaps).catch(() => {});
     load();
+    getJson<WorkMap[]>("/api/workmaps").then(setMaps).catch(() => {});
     const id = setInterval(load, 3000);
     return () => clearInterval(id);
   }, []);
 
-  const defaultTask = pickMap(maps)?.id ?? "";
-  const find = (m: Mine) => {
-    const map = maps.find((x) => x.id === m.workmapId);
-    const q = map?.open_questions.find((x) => x.id === m.questionId) as Answered | undefined;
-    return map && q ? { map, q } : null;
-  };
-  const myItems = mine.map((m) => ({ m, found: find(m) })).filter((x) => x.found);
-  const othersAnswered = maps
-    .flatMap((map) => map.open_questions.filter((q) => q.status === "answered").map((q) => ({ map, q: q as Answered })))
-    .filter(({ q }) => !mine.some((m) => m.questionId === q.id));
+  const othersAnswered = all.filter((q) => q.status === "answered" && !q.askers?.includes(LEARNER));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const target = task || defaultTask;
-    if (!question.trim() || !target) return;
+    if (!question.trim()) return;
     setBusy(true);
     setError(null);
-    setSentTo(null);
+    setSent(null);
     try {
-      const m = await submitQuestion(question.trim(), context.trim() || undefined, target);
-      addMine(m);
-      setMine(readMine());
-      const updated = await getJson<WorkMap[]>("/api/workmaps");
-      setMaps(updated);
-      const q = updated.find((x) => x.id === m.workmapId)?.open_questions.find((x) => x.id === m.questionId);
-      setSentTo(q?.route_to ?? "the experts");
+      const res = await postJson<Posted>("/api/questions", {
+        question: question.trim(),
+        context: context.trim() || undefined,
+        asker: LEARNER,
+        mapId: task || undefined,
+      });
+      setSent(res);
       setQuestion("");
       setContext("");
+      load();
     } catch (err) {
       setError(`Could not send your question: ${(err as Error).message}`);
     } finally {
@@ -153,7 +89,8 @@ export function LearnerMinute() {
         <div className="lm-row">
           <label>
             About which task?
-            <select value={task || defaultTask} onChange={(e) => setTask(e.target.value)} disabled={busy}>
+            <select value={task} onChange={(e) => setTask(e.target.value)} disabled={busy}>
+              <option value="">Let Understudy decide</option>
               {maps.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.workflow}
@@ -168,25 +105,32 @@ export function LearnerMinute() {
           </label>
         </div>
         <div className="row">
-          <button type="submit" className="primary" disabled={busy || !question.trim() || maps.length === 0}>
+          <button type="submit" className="primary" disabled={busy || !question.trim()}>
             {busy ? "Finding the right expert…" : "Ask the experts"}
           </button>
-          {sentTo && <span className="lm-sent">Sent to {sentTo} · the answer will show up below</span>}
+          {sent && (
+            <span className="lm-sent">
+              {sent.merged
+                ? `Someone already asked this. Added your vote; it's with ${sent.question.route_to ?? "the experts"}`
+                : `Sent to ${sent.question.route_to ?? "the experts"} · the answer will show up below`}
+            </span>
+          )}
           {error && <span className="err small">{error}</span>}
         </div>
       </form>
 
       <section>
         <h3 className="eyebrow">My questions</h3>
-        {myItems.length === 0 ? (
-          <p className="muted small">Questions you ask here, and their answers, show up in this list.</p>
+        {mine === null ? (
+          <p className="muted small">Loading…</p>
+        ) : mine.length === 0 ? (
+          <p className="muted small">Questions you ask here or through the Assistant, and their answers, show up in this list.</p>
         ) : (
           <ul className="lm-list">
-            {myItems.map(({ m, found }) => {
-              const { map, q } = found!;
+            {mine.map((q) => {
               const answered = q.status === "answered";
               return (
-                <li key={m.questionId} className={`lm-item ${answered ? "done" : "waiting"}`}>
+                <li key={`${q.map_id}.${q.id}`} className={`lm-item ${answered ? "done" : "waiting"}`}>
                   <span className="lib-pills">
                     <span className={`pill ${answered ? "ok" : "gap"}`}>{answered ? "Answered" : "Waiting"}</span>
                     {q.asked_by_count > 1 && <span className="pill line">Also asked by {q.asked_by_count - 1} more</span>}
@@ -194,10 +138,9 @@ export function LearnerMinute() {
                   <b>{q.q}</b>
                   {answered ? (
                     <>
-                      <q>{q.answer_clean ?? q.answer}</q>
+                      <q>{q.answer}</q>
                       <span className="muted small">
-                        {q.route_to} · now part of{" "}
-                        <a href={`#/learner/knowledge/${map.id}`}>{map.workflow}</a>
+                        {q.route_to} · now part of <a href={`#/learner/knowledge/${q.map_id}`}>{q.workflow}</a>
                       </span>
                     </>
                   ) : (
@@ -217,12 +160,12 @@ export function LearnerMinute() {
         <section>
           <h3 className="eyebrow">Recently answered for the team</h3>
           <ul className="lm-list">
-            {othersAnswered.map(({ map, q }) => (
-              <li key={`${map.id}.${q.id}`} className="lm-item done">
+            {othersAnswered.map((q) => (
+              <li key={`${q.map_id}.${q.id}`} className="lm-item done">
                 <b>{q.q}</b>
-                <q>{q.answer_clean ?? q.answer}</q>
+                <q>{q.answer}</q>
                 <span className="muted small">
-                  {q.route_to} · <a href={`#/learner/knowledge/${map.id}`}>{map.workflow}</a>
+                  {q.route_to} · <a href={`#/learner/knowledge/${q.map_id}`}>{q.workflow}</a>
                 </span>
               </li>
             ))}

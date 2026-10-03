@@ -74,7 +74,7 @@ export function WorkMapScreen({ id }: { id: string }) {
 
         {step && (
           <article className="wm-detail" aria-live="polite">
-            <ClipPlayer key={step.id} at={step.moment.clip_s} sessionId={map.sample ? undefined : map.id} />
+            <ClipPlayer key={step.id} at={step.moment.clip_s} sessionId={step.moment.session ?? (map.sample ? undefined : map.id)} />
             <dl className="wm-facts">
               <dt>Moment</dt>
               <dd>
