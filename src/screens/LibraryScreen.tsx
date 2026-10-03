@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getJson } from "../shared/api";
 import type { WorkMap } from "../shared/types";
-import { computeMastery, onProgress, readProgress } from "./progress";
+import { computeMastery, useProgress } from "./progress";
 import { resetDemo } from "./resetDemo";
 import "./screens.css";
 
@@ -15,7 +15,7 @@ const STUBS = [
 
 export function LibraryScreen() {
   const [maps, setMaps] = useState<WorkMap[]>([]);
-  const [progress, setProgress] = useState(readProgress);
+  const progress = useProgress();
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
@@ -24,7 +24,6 @@ export function LibraryScreen() {
     const id = setInterval(load, 3000);
     return () => clearInterval(id);
   }, []);
-  useEffect(() => onProgress(setProgress), []);
 
   const sorted = [...maps].sort((a, b) => Number(!!a.sample) - Number(!!b.sample) || b.updated_at.localeCompare(a.updated_at));
   const allGuardrails = maps.flatMap((m) => m.guardrails.map((g) => ({ ...g, key: `${m.id}.${g.id}` })));

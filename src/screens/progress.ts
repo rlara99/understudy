@@ -1,10 +1,19 @@
-// Owner: Pablo. What the new hire did in teach mode: which saves went through and which
-// guardrails stopped them. Kept in localStorage so the Library can show mastery too.
+// Owner: Pablo. What the new hire did in the work app: which saves went through and which
+// guardrails stopped them.
+//
+// The ERP (a separate app) owns the record and shares it over the relay channel "progress":
+//   ERP → { kind: "state", progress }  after every change and whenever asked
+//   Understudy → { kind: "ping" }       on opening a screen, to get the current state
+// Understudy keeps a copy so mastery still shows while the ERP is closed.
+// No server storage: data/sessions is reserved for real session logs.
+import { useEffect, useState } from "react";
 import { violatedGuardrails } from "../shared/guardrails";
+import { publish, subscribe } from "../shared/relay";
 import type { Guardrail, Invoice, Step, WorkMap } from "../shared/types";
 
-const KEY = "understudy.progress";
-const CHANGED = "understudy-progress";
+const CHANNEL = "progress";
+const ERP_KEY = "understudy.erp.progress";
+const VIEW_KEY = "understudy.progress.view";
 
 export interface InvoiceProgress {
   /** Guardrail ids that blocked a save of this invoice. */
@@ -14,55 +23,88 @@ export interface InvoiceProgress {
 }
 export type Progress = Record<string, InvoiceProgress>;
 
-export function readProgress(): Progress {
+type ProgressMsg = { kind: "state"; progress: Progress } | { kind: "ping" };
+
+function read(key: string): Progress {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    return JSON.parse(localStorage.getItem(key) ?? "{}");
   } catch {
     return {};
   }
 }
 
-function write(p: Progress) {
+function write(key: string, p: Progress) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    localStorage.setItem(key, JSON.stringify(p));
   } catch {
-    /* storage blocked */
+    /* storage blocked: lives in memory for this page only */
   }
-  dispatchEvent(new Event(CHANGED));
+}
+
+/* ---------- ERP side (the work app records what the trainee does) ---------- */
+
+function erpUpdate(fn: (p: Progress) => void) {
+  const p = read(ERP_KEY);
+  fn(p);
+  write(ERP_KEY, p);
+  publish(CHANNEL, { kind: "state", progress: p } satisfies ProgressMsg);
 }
 
 export function recordBlocked(invoice: string, guardrailIds: string[]) {
-  const p = readProgress();
-  const cur = p[invoice] ?? { blocked: [] };
-  p[invoice] = { ...cur, blocked: [...new Set([...cur.blocked, ...guardrailIds])] };
-  write(p);
+  erpUpdate((p) => {
+    const cur = p[invoice] ?? { blocked: [] };
+    p[invoice] = { ...cur, blocked: [...new Set([...cur.blocked, ...guardrailIds])] };
+  });
 }
 
 export function recordSaved(invoice: Invoice) {
-  const p = readProgress();
-  p[invoice.id] = { blocked: p[invoice.id]?.blocked ?? [], saved: invoice };
-  write(p);
+  erpUpdate((p) => {
+    p[invoice.id] = { blocked: p[invoice.id]?.blocked ?? [], saved: invoice };
+  });
 }
 
-export function resetProgress() {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* nothing stored */
-  }
-  dispatchEvent(new Event(CHANGED));
+/** ERP: clear the trainee's record (on Reset demo). */
+export function clearErpProgress() {
+  erpUpdate((p) => {
+    for (const k of Object.keys(p)) delete p[k];
+  });
 }
 
-/** Calls fn whenever progress changes, in this tab or another one. */
-export function onProgress(fn: (p: Progress) => void): () => void {
-  const handler = () => fn(readProgress());
-  addEventListener(CHANGED, handler);
-  addEventListener("storage", handler);
-  return () => {
-    removeEventListener(CHANGED, handler);
-    removeEventListener("storage", handler);
-  };
+/** ERP: answer Understudy's pings with the current record. Returns an unsubscribe function. */
+export function serveProgress(): () => void {
+  return subscribe<ProgressMsg>(CHANNEL, (msg) => {
+    if (msg.kind === "ping") publish(CHANNEL, { kind: "state", progress: read(ERP_KEY) } satisfies ProgressMsg);
+  });
 }
+
+/* ---------- Understudy side (screens that show mastery) ---------- */
+
+/** Understudy: forget the cached copy (on Reset demo; the ERP clears its own on the reset message). */
+export function resetProgressView() {
+  write(VIEW_KEY, {});
+  publish(CHANNEL, { kind: "state", progress: {} } satisfies ProgressMsg);
+}
+
+/** Live new-hire progress for a React screen. */
+export function useProgress(): Progress {
+  const [progress, setProgress] = useState<Progress>(() => read(VIEW_KEY));
+  useEffect(() => {
+    const unsubscribe = subscribe<ProgressMsg>(CHANNEL, (msg) => {
+      if (msg.kind !== "state") return;
+      write(VIEW_KEY, msg.progress);
+      setProgress(msg.progress);
+    });
+    // Ask the ERP (if it's open) for the latest; give the stream a moment to connect first.
+    const t = setTimeout(() => publish(CHANNEL, { kind: "ping" } satisfies ProgressMsg), 400);
+    return () => {
+      clearTimeout(t);
+      unsubscribe();
+    };
+  }, []);
+  return progress;
+}
+
+/* ---------- mastery ---------- */
 
 /** True when every `when` condition of the guardrail holds for this invoice. */
 function applies(invoice: Invoice, g: Guardrail): boolean {

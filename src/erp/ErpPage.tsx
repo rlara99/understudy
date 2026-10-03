@@ -1,17 +1,23 @@
-// Owner: Pablo. Fake ERP. Open at /#/erp (capture) or /#/erp/teach (new hire).
-// Every change is published as an ErpEvent so the voice panel can follow along.
-// Teach mode loads the newest Work Map and blocks any save that breaks one of its guardrails.
+// Owner: Pablo. The fake ERP: a separate work app, not part of Understudy's nav.
+// Runs at http://localhost:5173/erp/ (entry: erp/index.html → src/erp/main.tsx).
+// Every change is published as an ErpEvent over the API relay so Understudy can follow along.
+// Signed in as the trainee (teach mode), it loads the newest Work Map and blocks any save
+// that breaks one of its guardrails: that's Understudy stepping in.
 import { useEffect, useRef, useState } from "react";
 import { onControl, postControl } from "../capture/control";
 import { getJson } from "../shared/api";
 import { publishErpEvent } from "../shared/bus";
 import { violatedGuardrails } from "../shared/guardrails";
 import type { ErpEvent, Guardrail, Invoice, WorkMap } from "../shared/types";
-import { MasteryPanel } from "../screens/MasteryPanel";
-import { recordBlocked, recordSaved, resetProgress } from "../screens/progress";
+import { clearErpProgress, recordBlocked, recordSaved, serveProgress } from "../screens/progress";
 import "./erp.css";
 
-type Mode = "capture" | "teach";
+export type Mode = "capture" | "teach";
+
+export const USERS: { mode: Mode; name: string; role: string }[] = [
+  { mode: "capture", name: "Sabrina M.", role: "AP specialist" },
+  { mode: "teach", name: "Lena K.", role: "AP trainee" },
+];
 type TextField = "asset_no" | "note";
 type ChoiceField = "cost_center" | "approval" | "status";
 /** The form also has a free-text posting note, which is not part of the seed data. */
@@ -52,14 +58,14 @@ function writeEdits(mode: Mode, list: Draft[]) {
   }
 }
 
-export function resetErp() {
+/** Drop local edits so the seed invoices come back. Triggered by Understudy's Reset demo over the relay. */
+function resetErp() {
   try {
     localStorage.removeItem(storeKey("capture"));
     localStorage.removeItem(storeKey("teach"));
   } catch {
     /* nothing stored */
   }
-  resetProgress();
 }
 
 /** Newest confirmed real map wins; the hand-made sample is the fallback. */
@@ -84,7 +90,8 @@ const publish = (e: Omit<ErpEvent, "t">) => {
   if (!offRecordNow) publishErpEvent({ t: Date.now(), ...e });
 };
 
-export function ErpPage({ mode }: { mode: Mode }) {
+export function ErpPage({ mode, onSwitchUser }: { mode: Mode; onSwitchUser: (mode: Mode) => void }) {
+  const [reloadKey, setReloadKey] = useState(0);
   const [invoices, setInvoices] = useState<Draft[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [map, setMap] = useState<WorkMap | null>(null);
@@ -93,16 +100,25 @@ export function ErpPage({ mode }: { mode: Mode }) {
   const [capture, setCapture] = useState({ recording: false, offRecord: false });
   const focusValue = useRef<Partial<Record<TextField, string>>>({});
 
-  // Follow the recorder in the panel tab; ask for its state in case a session is already running.
+  // Follow Understudy's recorder (and its Reset demo); ask for its state in case a session is already running.
   useEffect(() => {
     const unsubscribe = onControl((msg) => {
+      if (msg.kind === "reset") {
+        resetErp();
+        clearErpProgress();
+        setReloadKey((k) => k + 1);
+        return;
+      }
       if (msg.kind !== "state") return;
       offRecordNow = msg.offRecord;
       setCapture({ recording: msg.recording, offRecord: msg.offRecord });
     });
     postControl({ kind: "ping" });
+    // The trainee's progress lives here; Understudy's screens ask for it over the relay.
+    const unserve = serveProgress();
     return () => {
       unsubscribe();
+      unserve();
       offRecordNow = false;
     };
   }, []);
@@ -110,11 +126,12 @@ export function ErpPage({ mode }: { mode: Mode }) {
 
   useEffect(() => {
     setDraft(null);
+    setBlocked([]);
     getJson<Invoice[]>("/api/invoices").then((all) => {
       const edits = readEdits(mode);
       setInvoices(all.filter((i) => i.phase === mode).map((i) => edits[i.id] ?? { ...i, note: "" }));
     });
-  }, [mode]);
+  }, [mode, reloadKey]);
 
   // Reload the map when the tab regains focus, so a Gap Loop patch applies without a refresh.
   useEffect(() => {
@@ -123,7 +140,7 @@ export function ErpPage({ mode }: { mode: Mode }) {
     load();
     addEventListener("focus", load);
     return () => removeEventListener("focus", load);
-  }, [mode]);
+  }, [mode, reloadKey]);
 
   function open(inv: Draft) {
     setDraft({ ...inv });
@@ -199,10 +216,17 @@ export function ErpPage({ mode }: { mode: Mode }) {
         <span className="erp-mod">Accounts payable</span>
         <span className="erp-sep" aria-hidden="true">/</span>
         <span className="erp-mod">Invoice processing</span>
-        <span className={`erp-mode ${mode}`}>
-          <i aria-hidden="true" />
-          {mode === "capture" ? "Expert session" : "Training"}
-        </span>
+        <label className={`erp-user ${mode}`}>
+          <span className="erp-user-av" aria-hidden="true">{initials(USERS.find((u) => u.mode === mode)!.name)}</span>
+          <span className="sr-only">Signed in as</span>
+          <select value={mode} onChange={(e) => onSwitchUser(e.target.value as Mode)}>
+            {USERS.map((u) => (
+              <option key={u.mode} value={u.mode}>
+                {u.name} · {u.role}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
 
       {capture.offRecord && (
@@ -239,7 +263,6 @@ export function ErpPage({ mode }: { mode: Mode }) {
               <span className="erp-row-amt">{money(inv.amount, inv.currency)}</span>
             </button>
           ))}
-          {mode === "teach" && map && <MasteryPanel map={map} />}
         </aside>
 
         <section className="erp-detail">
@@ -341,8 +364,9 @@ export function ErpPage({ mode }: { mode: Mode }) {
                 </button>
                 {saved && <span className="erp-ok">Saved as {statusLabel(draft.status).toLowerCase()}</span>}
                 {mode === "teach" && map && (
-                  <span className="erp-gr">
-                    {map.guardrails.length} guardrails from {map.expert}
+                  <span className="erp-gr" title="Understudy blocks saves that break the expert's rules">
+                    <i aria-hidden="true" />
+                    Understudy · {map.guardrails.length} guardrails from {map.expert}
                   </span>
                 )}
               </div>

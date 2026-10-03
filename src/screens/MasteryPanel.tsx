@@ -1,13 +1,11 @@
-// Owner: Pablo. New hire's progress against the Work Map: mastered steps, steps to practice,
-// and questions sent back to the expert. Shown in the ERP's teach mode.
-import { useEffect, useState } from "react";
+// Owner: Pablo. New hire's progress against a Work Map: mastered steps, steps to practice,
+// and questions sent back to the expert. Shown on the Knowledge Repository task page.
 import type { WorkMap } from "../shared/types";
-import { computeMastery, onProgress, readProgress } from "./progress";
+import { computeMastery, useProgress } from "./progress";
 import "./screens.css";
 
 export function MasteryPanel({ map }: { map: WorkMap }) {
-  const [progress, setProgress] = useState(readProgress);
-  useEffect(() => onProgress(setProgress), []);
+  const progress = useProgress();
 
   const m = computeMastery(map, progress);
   const practice = m.steps.filter((s) => s.status === "practice");
@@ -62,7 +60,7 @@ export function MasteryPanel({ map }: { map: WorkMap }) {
       )}
 
       {m.score === null && flagged.length === 0 && (
-        <p className="muted small">Save an invoice to see which of {map.expert}'s steps you've got.</p>
+        <p className="muted small">Work an invoice in the ERP to see which of {map.expert}'s steps you've got.</p>
       )}
     </section>
   );

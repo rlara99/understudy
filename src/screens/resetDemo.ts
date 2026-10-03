@@ -1,23 +1,27 @@
 // Owner: Pablo. One click back to a clean demo between rehearsal runs.
 import pristineSample from "../../data/seed/sample-invoice-processing.json";
+import { postControl } from "../capture/control";
 import { clearRecordings } from "../capture/recordings";
-import { resetErp } from "../erp/ErpPage";
 import { putJson } from "../shared/api";
 import type { WorkMap } from "../shared/types";
+import { resetProgressView } from "./progress";
 
 /**
- * Restores seed invoices, clears new-hire progress and stored recordings, and puts the
- * sample Work Map back the way it was committed (undoing Quick Ask patches).
- * Work Maps created by capture sessions are kept; the ERP always uses the newest one.
+ * Tells the separate ERP app to restore its seed invoices and clear the trainee's progress
+ * (relay message), clears stored recordings, and puts the sample Work Map back the way it was
+ * committed (undoing Quick Ask patches). Work Maps created by capture sessions are kept.
  */
 export async function resetDemo() {
-  resetErp();
+  postControl({ kind: "reset" });
+  resetProgressView();
   try {
     localStorage.removeItem("understudy.quickAsk");
+    localStorage.removeItem("understudy.myQuestions");
   } catch {
     /* nothing stored */
   }
-  await clearRecordings().catch(() => {});
-  const map = pristineSample as WorkMap;
-  await putJson(`/api/workmaps/${map.id}`, map);
+  await Promise.all([
+    clearRecordings().catch(() => {}),
+    putJson(`/api/workmaps/${(pristineSample as WorkMap).id}`, pristineSample),
+  ]);
 }

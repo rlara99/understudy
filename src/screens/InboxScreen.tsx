@@ -1,13 +1,15 @@
-// Owner: Pablo. Expert Minute inbox: open questions routed to experts, no names of who asked.
-// "Start voice session" hands the question to the panel (quick_ask mode).
+// Owner: Pablo. Expert › Expert Minute: open questions routed to experts, no names of who asked.
+// "Start voice session" hands the question to the panel (quick_ask mode) via openSession:
+// a companion window on desktop, the same tab in a browser.
 // "Answer in text" is the fallback from the cut list: it patches the Work Map directly.
 import { useEffect, useState } from "react";
 import { getJson, postJson } from "../shared/api";
+import { openSession, SESSION_ROUTES } from "../shared/desktop";
 import type { Expert, OpenQuestion, WorkMap } from "../shared/types";
 import { setPendingQuickAsk } from "./quickAsk";
 import "./screens.css";
 
-type Item = OpenQuestion & { map: WorkMap };
+type Item = OpenQuestion & { map: WorkMap; answer_clean?: string };
 
 export function InboxScreen() {
   const [maps, setMaps] = useState<WorkMap[]>([]);
@@ -30,7 +32,7 @@ export function InboxScreen() {
     <div className="screen inbox">
       <header>
         <h2>Expert Minute</h2>
-        <p className="muted">Questions new hires hit that no Work Map answers yet. About a minute each, by voice.</p>
+        <p className="muted">Questions new hires hit that no task answers yet. About a minute each, by voice.</p>
       </header>
 
       {open.length === 0 ? (
@@ -50,7 +52,7 @@ export function InboxScreen() {
             {answered.map((q) => (
               <li key={`${q.map.id}.${q.id}`}>
                 <b>{q.q}</b>
-                <q>{q.answer}</q>
+                <q>{q.answer_clean ?? q.answer}</q>
                 <span className="muted small">
                   {q.route_to} · added to <a href={`#/map/${q.map.id}`}>{q.map.workflow}</a>
                 </span>
@@ -77,7 +79,7 @@ function QuestionCard({ item: q, expert, onAnswered }: { item: Item; expert?: Ex
       context: q.context,
       expert: q.route_to,
     });
-    location.hash = "#/panel";
+    openSession(SESSION_ROUTES.quickAsk);
   }
 
   async function submit() {
