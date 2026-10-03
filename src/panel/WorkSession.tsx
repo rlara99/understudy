@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { IMPORTANT_FIELDS, PauseDetector } from "../agents/pauseRule";
 import { AGENT_NAME, INTERVIEWER_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
 import { useScreenRecorder } from "../capture/useScreenRecorder";
-import { postJson, putJson } from "../shared/api";
+import { getJson, postJson, putJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
 import { closeSession } from "../shared/desktop";
 import type { ErpEvent, SessionLog, TranscriptLine } from "../shared/types";
@@ -62,6 +62,13 @@ function Session({ mode }: { mode: Mode }) {
     transcript: [],
   }));
   const [withCallAudio, setWithCallAudio] = useState(false);
+  const [name, setName] = useState(
+    () => `${live ? "Live" : "Recorded"} session · ${new Date().toLocaleDateString([], { month: "short", day: "numeric" })}`,
+  );
+  /** Part number: 1 for a new session, n+1 when continuing an earlier one with the same name. */
+  const [part, setPart] = useState(1);
+  const [earlier, setEarlier] = useState<{ name: string; parts: number; last: string }[]>([]);
+  const [micLevel, setMicLevel] = useState(0);
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [micId, setMicId] = useState("");
   const [agentSpeaking, setAgentSpeaking] = useState(false);
@@ -109,7 +116,7 @@ function Session({ mode }: { mode: Mode }) {
         n.resent = true;
         setTimeout(() => {
           if (conv.current.status !== "connected" || offRef.current) return;
-          mic.hold(8000);
+          mic.hold(5000);
           conv.current.sendUserMessage(n.text);
           note("question resent after interruption");
         }, 800);
@@ -133,7 +140,6 @@ function Session({ mode }: { mode: Mode }) {
           return;
         }
         pause.current.activity();
-        mic.hold(2000); // she may reply: keep noise out until she has
         if (NAME_RE.test(message)) {
           const heardAt = Date.now();
           setTimeout(() => {
@@ -144,6 +150,7 @@ function Session({ mode }: { mode: Mode }) {
           }, 1200);
         }
       }
+      if (role !== "agent") note(`heard you: "${message.slice(0, 80)}"`);
       const line: TranscriptLine = { t: Date.now() - zero.current, speaker: role === "agent" ? "agent" : "expert", text: message };
       setLog((l) => ({ ...l, transcript: [...l.transcript, line] }));
     },
@@ -154,14 +161,14 @@ function Session({ mode }: { mode: Mode }) {
 
   const sendNudge = (nudge: string, resend: boolean) => {
     const sentAt = Date.now();
-    mic.hold(8000);
+    mic.hold(5000);
     lastNudge.current = { text: nudge, at: sentAt, resent: false };
     conv.current.sendUserMessage(nudge);
     note(nudge.slice(0, 90));
     if (!resend) return;
     setTimeout(() => {
       if (lastAgentSpeech.current >= sentAt || conv.current.status !== "connected") return;
-      mic.hold(8000);
+      mic.hold(5000);
       conv.current.sendUserMessage(nudge);
     }, 5000);
   };
@@ -291,13 +298,39 @@ function Session({ mode }: { mode: Mode }) {
     loadMics(false);
   }, []);
 
+  // Earlier sessions of this kind that haven't been debriefed yet, grouped by name, to continue one.
+  useEffect(() => {
+    getJson<(Omit<SessionLog, "events" | "transcript"> & { event_count: number })[]>("/api/sessions")
+      .then((all) => {
+        const groups = new Map<string, { name: string; parts: number; last: string }>();
+        for (const s of all) {
+          if (s.mode !== mode || s.reviewed_in) continue;
+          const n = s.name ?? s.title;
+          if (!n) continue;
+          const g = groups.get(n) ?? { name: n, parts: 0, last: s.started_at };
+          g.parts = Math.max(g.parts, s.part ?? 1);
+          if (s.started_at > g.last) g.last = s.started_at;
+          groups.set(n, g);
+        }
+        setEarlier([...groups.values()].sort((a, b) => b.last.localeCompare(a.last)).slice(0, 6));
+      })
+      .catch(() => {});
+  }, [mode]);
+
+  // Mic level, so you can see that Claudia hears you.
+  useEffect(() => {
+    if (!live || !connected) return;
+    const id = setInterval(() => setMicLevel(conv.current.getInputVolume()), 150);
+    return () => clearInterval(id);
+  }, [live, connected]);
+
   // ---------- Start / finish ----------
   const start = async () => {
     setError(null);
     const t0 = await screen.start(logRef.current.id);
     zero.current = t0 ?? Date.now();
     if (t0 === null) note("screen not shared: continuing without a recording");
-    setLog((l) => ({ ...l, started_at: new Date(zero.current).toISOString() }));
+    setLog((l) => ({ ...l, started_at: new Date(zero.current).toISOString(), name: name.trim() || undefined, part }));
     setPhase("running");
     if (live) {
       conversation.startSession({
@@ -336,7 +369,9 @@ function Session({ mode }: { mode: Mode }) {
         transcript,
         ended_at: new Date().toISOString(),
         off_record: spans,
-        title: `${live ? "Live" : "Record & learn"} · ${apps.join(", ") || "screen"}${tasks ? ` · ${tasks} task${tasks > 1 ? "s" : ""}` : ""}`,
+        title: l.name
+          ? `${l.name}${(l.part ?? 1) > 1 ? ` · part ${l.part}` : ""}`
+          : `${live ? "Live" : "Record & learn"} · ${apps.join(", ") || "screen"}${tasks ? ` · ${tasks} task${tasks > 1 ? "s" : ""}` : ""}`,
       } satisfies SessionLog);
       setPhase("saved");
       if (goToDebrief) closeSession("expert/debrief");
@@ -354,7 +389,7 @@ function Session({ mode }: { mode: Mode }) {
       <header className="ws-head">
         <span className={`ws-dot ${phase === "running" ? (screen.offRecord ? "off" : "rec") : ""}`} aria-hidden="true" />
         <div>
-          <b>{live ? `Live with ${AGENT_NAME}` : "Record & learn"}</b>
+          <b>{phase === "setup" ? (live ? `Live with ${AGENT_NAME}` : "Record & learn") : `${log.name ?? name}${part > 1 ? ` · part ${part}` : ""}`}</b>
           <span className="muted small">
             {live ? `${AGENT_NAME} asks when something interesting happens` : "Records and transcribes. No questions."}
           </span>
@@ -364,6 +399,46 @@ function Session({ mode }: { mode: Mode }) {
 
       {phase === "setup" && (
         <section className="ws-setup">
+          <label htmlFor="ws-name">{part > 1 ? `Continuing (part ${part})` : "Name this session"}</label>
+          <div className="row">
+            <input
+              id="ws-name"
+              style={{ flex: 1, minWidth: 0 }}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setPart(1);
+              }}
+              placeholder="e.g. Supplier invoices, December close"
+            />
+            {part > 1 && (
+              <button type="button" className="quiet" onClick={() => setPart(1)}>
+                New instead
+              </button>
+            )}
+          </div>
+          {earlier.length > 0 && part === 1 && (
+            <div className="ws-earlier">
+              <span className="muted small">Or continue an earlier one:</span>
+              {earlier.map((g) => (
+                <button
+                  key={g.name}
+                  type="button"
+                  className="ws-chip"
+                  onClick={() => {
+                    setName(g.name);
+                    setPart(g.parts + 1);
+                  }}
+                >
+                  {g.name}
+                  <span className="muted small">
+                    {" "}
+                    · {g.parts} part{g.parts > 1 ? "s" : ""} · {new Date(g.last).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           <label htmlFor="ws-mic">Microphone</label>
           <div className="row">
             <select id="ws-mic" value={micId} onChange={(e) => setMicId(e.target.value)}>
@@ -401,6 +476,11 @@ function Session({ mode }: { mode: Mode }) {
           <div className="ws-status">
             <span>{screen.recording ? "Recording screen" : "Not recording screen"}</span>
             {live && <span>{connected ? (agentSpeaking ? `${AGENT_NAME} is speaking` : `${AGENT_NAME} is listening`) : "Connecting…"}</span>}
+            {live && connected && (
+              <span className="ws-level" title="Mic level: should move when you talk">
+                Mic <i style={{ width: `${Math.min(100, Math.round(micLevel * 300))}%` }} />
+              </span>
+            )}
             {!live && <span>{audio.callAudio ? "Mic + call audio" : "Mic"}{audio.transcribing ? " · transcribing…" : ""}</span>}
           </div>
           {live && lastQuestion && !screen.offRecord && <blockquote className="ws-question">{lastQuestion}</blockquote>}

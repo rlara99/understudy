@@ -138,7 +138,6 @@ function Tutor() {
       setTranscript((t) => [...t, { t: Date.now() - t0.current, who: role === "agent" ? "tutor" : "new hire", text: message }]);
       if (role !== "agent") {
         lastLearnerText.current = message;
-        mic.hold(3000);
       }
       // Backups that don't depend on client tools being set up in the dashboard:
       if (role !== "agent" && GAP_RE.test(message)) flagGap(currentInvoice.current);
@@ -150,7 +149,7 @@ function Tutor() {
   conv.current = conversation;
   /** Send the tutor a message it should answer, with the mic closed until it has. */
   const say = (text: string) => {
-    mic.hold(8000);
+    mic.hold(5000);
     conv.current.sendUserMessage(text);
   };
 

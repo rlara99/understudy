@@ -160,6 +160,10 @@ export interface SessionLog {
   ended_at?: string;
   /** Short title for the session list, e.g. "Supplier invoices (3)". */
   title?: string;
+  /** The expert's own name for this piece of work. Parts of a resumed session share it. */
+  name?: string;
+  /** 1 for a new session, 2+ when an earlier session with the same name was continued. */
+  part?: number;
   /** Set once a debrief turned this session into a Work Map. */
   reviewed_in?: string;
   expert?: string;

@@ -82,7 +82,6 @@ function Debrief() {
         if (!conv.current.isSpeaking) sendGaps();
       }, 8000),
     onMessage: ({ message, role }) => {
-      if (role !== "agent") mic.hold(4000);
       setLines((l) => [...l, { t: Date.now() - t0.current, speaker: role === "agent" ? "agent" : "expert", text: message }]);
     },
     onError: (m) => setError(String(m)),
@@ -92,7 +91,7 @@ function Debrief() {
   conv.current = conversation;
   /** Send Claudia a message she should answer, with the mic closed until she has. */
   const say = (text: string) => {
-    mic.hold(8000);
+    mic.hold(5000);
     conv.current.sendUserMessage(text);
   };
 
@@ -120,7 +119,10 @@ function Debrief() {
     setError(null);
     setPhase("mapping");
     try {
-      const r = await postJson<{ map: WorkMap; gaps: string[] }>("/api/map", { sessionIds: selected, expert: EXPERT, team: TEAM });
+      // If everything selected shares one name, that name becomes the Work Map's title.
+      const names = [...new Set((sessions ?? []).filter((s) => selected.includes(s.id)).map((s) => s.name))];
+      const workflow = names.length === 1 && names[0] ? names[0] : undefined;
+      const r = await postJson<{ map: WorkMap; gaps: string[] }>("/api/map", { sessionIds: selected, workflow, expert: EXPERT, team: TEAM });
       setMap(r.map);
       setGaps(r.gaps);
       setPhase("ready");
@@ -167,9 +169,22 @@ function Debrief() {
     }
   };
 
-  const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  const today = (sessions ?? []).filter((s) => isToday(s.started_at));
-  const earlier = (sessions ?? []).filter((s) => !isToday(s.started_at)).slice(0, 10);
+  // One row per named session: all its parts (continued sessions) are debriefed together.
+  const groups = (() => {
+    const map = new Map<string, { key: string; label: string; parts: SessionSummary[]; last: string }>();
+    for (const s of sessions ?? []) {
+      const key = s.name ?? s.id;
+      const g = map.get(key) ?? { key, label: s.name ?? s.title ?? (s.mode === "record" ? "Record & learn" : "Live session"), parts: [], last: s.started_at };
+      g.parts.push(s);
+      if (s.started_at > g.last) g.last = s.started_at;
+      map.set(key, g);
+    }
+    return [...map.values()].sort((a, b) => b.last.localeCompare(a.last));
+  })();
+  const toggleGroup = (ids: string[]) =>
+    setSelected((s) => (ids.every((id) => s.includes(id)) ? s.filter((x) => !ids.includes(x)) : [...new Set([...s, ...ids])]));
+  const today = groups.filter((g) => isToday(g.last));
+  const earlier = groups.filter((g) => !isToday(g.last)).slice(0, 10);
 
   return (
     <div className="ws" style={{ maxWidth: 720 }}>
@@ -185,20 +200,27 @@ function Debrief() {
           <h3 className="eyebrow">Today</h3>
           {sessions === null && <p className="muted">Loading sessions…</p>}
           {sessions !== null && today.length === 0 && <p className="muted">No sessions recorded today yet. Start Work mode first.</p>}
-          {[...today, ...earlier].map((s, i) => (
-            <label key={s.id} className="ws-check" style={i === today.length && i > 0 ? { marginTop: 12 } : undefined}>
-              <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggle(s.id)} />
-              <span>
-                <b>{s.title ?? (s.mode === "record" ? "Record & learn" : "Live session")}</b>
-                <span className="muted small">
-                  {isToday(s.started_at) ? timeOf(s.started_at) : new Date(s.started_at).toLocaleDateString()} · {s.event_count} events ·{" "}
-                  {s.transcript_count} lines{s.reviewed_in ? " · already reviewed" : ""}
+          {[...today, ...earlier].map((g, i) => {
+            const ids = g.parts.map((p) => p.id);
+            const events = g.parts.reduce((n, p) => n + p.event_count, 0);
+            const lines = g.parts.reduce((n, p) => n + p.transcript_count, 0);
+            const kinds = [...new Set(g.parts.map((p) => (p.mode === "record" ? "recorded" : "live")))].join(" + ");
+            return (
+              <label key={g.key} className="ws-check" style={i === today.length && i > 0 ? { marginTop: 12 } : undefined}>
+                <input type="checkbox" checked={ids.every((id) => selected.includes(id))} onChange={() => toggleGroup(ids)} />
+                <span>
+                  <b>{g.label}</b>
+                  <span className="muted small">
+                    {isToday(g.last) ? timeOf(g.last) : new Date(g.last).toLocaleDateString()} · {kinds}
+                    {g.parts.length > 1 ? ` · ${g.parts.length} parts` : ""} · {events} events · {lines} lines
+                    {g.parts.every((p) => p.reviewed_in) ? " · already reviewed" : ""}
+                  </span>
                 </span>
-              </span>
-            </label>
-          ))}
+              </label>
+            );
+          })}
           <button type="button" className="ws-primary" disabled={selected.length === 0} onClick={prepare}>
-            Prepare debrief ({selected.length} session{selected.length === 1 ? "" : "s"})
+            Prepare debrief ({selected.length} recording{selected.length === 1 ? "" : "s"})
           </button>
         </section>
       )}

@@ -24,3 +24,7 @@
 .eyebrow { font-size: 0.75em; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted, #71717a); margin: 0 0 6px; }
 @media (prefers-color-scheme: dark) { .ws-off { background: #3f1d1d; color: #fecaca; } }
 .session-main { padding: 16px; }
+.ws-earlier { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ws-chip { border-radius: 999px; padding: 4px 10px; font-size: 0.9em; }
+.ws-level { display: inline-flex; align-items: center; gap: 6px; }
+.ws-level i { display: inline-block; height: 6px; min-width: 2px; max-width: 60px; width: 0; background: #16a34a; border-radius: 3px; transition: width 0.12s linear; }
