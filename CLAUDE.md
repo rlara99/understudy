@@ -54,7 +54,8 @@ Claude calls live in `server/claude.ts`. Models: `claude-opus-5-5` for map/route
 
 ## ElevenLabs
 
-- Two agents in the dashboard: Interviewer and Tutor. Prompts and first messages are in `src/agents/prompts.ts`; paste them in.
+- Two agents in the dashboard: Interviewer and Tutor. Prompts and first messages live in `src/agents/prompts.ts` and are sent at session start as overrides (enable System prompt + First message overrides in each agent's Security tab). Agent name: `AGENT_NAME` (say "Hey Ada").
+- Pause timing: `src/agents/pauseRule.ts` (idle 1.5 s) and the 700 ms field-change merge in the panel.
 - Agents must be public (no auth) so the browser can start a session with just the agent ID.
 - Dynamic variables: `agent_name`, `expert_name`, plus `mode` (live | debrief | quick_ask) for the Interviewer.
 - Enable the `skip_turn` system tool on the Interviewer.
