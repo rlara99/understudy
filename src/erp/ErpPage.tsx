@@ -70,6 +70,13 @@ function pickMap(maps: WorkMap[]): WorkMap | null {
 const money = (amount: number, currency: string) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(amount);
 const statusLabel = (s: string) => STATUSES.find((x) => x.value === s)?.label ?? s;
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter((w) => /^[A-Za-zÀ-ž]/.test(w))
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
 const publish = (e: Omit<ErpEvent, "t">) => publishErpEvent({ t: Date.now(), ...e });
 
 export function ErpPage({ mode }: { mode: Mode }) {
@@ -166,9 +173,16 @@ export function ErpPage({ mode }: { mode: Mode }) {
   return (
     <div className="erp-app">
       <header className="erp-bar">
+        <span className="erp-mark" aria-hidden="true">K</span>
         <span className="erp-logo">Kessler Maschinenbau</span>
-        <span className="erp-mod">Accounts payable · Invoice processing</span>
-        <span className={`erp-mode ${mode}`}>{mode === "capture" ? "Expert session" : "Training"}</span>
+        <span className="erp-sep" aria-hidden="true">/</span>
+        <span className="erp-mod">Accounts payable</span>
+        <span className="erp-sep" aria-hidden="true">/</span>
+        <span className="erp-mod">Invoice processing</span>
+        <span className={`erp-mode ${mode}`}>
+          <i aria-hidden="true" />
+          {mode === "capture" ? "Expert session" : "Training"}
+        </span>
       </header>
 
       <div className="erp-body">
@@ -181,6 +195,7 @@ export function ErpPage({ mode }: { mode: Mode }) {
               className={`erp-row${draft?.id === inv.id ? " on" : ""}`}
               onClick={() => open(inv)}
             >
+              <span className="erp-avatar" aria-hidden="true">{initials(inv.supplier)}</span>
               <span className="erp-row-id">{inv.id}</span>
               <span className={`erp-st ${inv.status}`}>{statusLabel(inv.status)}</span>
               <span className="erp-row-sup">{inv.supplier}</span>
@@ -201,10 +216,15 @@ export function ErpPage({ mode }: { mode: Mode }) {
               }}
             >
               <div className="erp-title">
-                <h1>{draft.id}</h1>
+                <div>
+                  <h1>{draft.id}</h1>
+                  <span className="erp-subtitle">{draft.supplier}</span>
+                </div>
+                <span className="erp-total">{money(draft.amount, draft.currency)}</span>
                 <span className={`erp-st ${draft.status}`}>{statusLabel(draft.status)}</span>
               </div>
 
+              <div className="erp-section">Invoice details</div>
               <dl className="erp-facts">
                 <dt>Supplier</dt>
                 <dd>
@@ -225,6 +245,7 @@ export function ErpPage({ mode }: { mode: Mode }) {
                 <dd className="pii" aria-label="Contact hidden">{draft.contact_name ?? "n/a"}</dd>
               </dl>
 
+              <div className="erp-section">Coding and approval</div>
               <div className="erp-fields">
                 <label>
                   Cost center
