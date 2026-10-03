@@ -55,7 +55,7 @@ const MODULES: Record<Mode, Module[]> = {
     },
     {
       id: "debrief",
-      label: "Debrief and teach",
+      label: "Debrief & teach",
       hint: "Turn sessions into Work Maps",
       icon: <Icon d="M4 5h16v11H8l-4 4V5zM8 9h8M8 12h5" />,
       routes: ["expert/debrief", "map", "library"],
@@ -285,7 +285,7 @@ function LiveLauncher() {
       points={[
         "Questions at natural pauses, about what's on screen",
         "Off the record any time: the button in the ERP, the panel, or just say “off the record”",
-        "Finish the task, answer a short debrief, confirm the Work Map",
+        "Finish to save the session. Review it later in Debrief & teach (5 minutes).",
       ]}
       start="Start live session"
       onStart={() => openSession(SESSION_ROUTES.workLive)}
@@ -300,7 +300,11 @@ function RecordLauncher() {
       eyebrow="Expert · Work mode"
       title="Record and learn"
       lede="A silent session: Claudia records your screen and voice, transcribes it and asks nothing. You debrief later, in one go."
-      points={["No interruptions while you work", "Call audio only if you opt in", "Feeds the next debrief"]}
+      points={[
+        "No interruptions while you work",
+        "Call audio only if you opt in",
+        "Finish to save the session. Review it later in Debrief & teach (5 minutes).",
+      ]}
       start="Start recording"
       onStart={() => openSession(SESSION_ROUTES.workRecord)}
       erpHref={ERP_URL}
