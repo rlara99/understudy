@@ -39,6 +39,8 @@ Restart `npm run dev` after changing any `.env*` file. Only one copy can run (po
 | Other expert (Marta) | `/#/inbox` | Start voice session → Start Quick Ask → answer → "that's saved" |
 | Anyone | `/#/library` | Coverage, mastery, open-question badges. **Reset demo** restores seed data. |
 
+Routes (`src/App.tsx`): `#/erp` (expert), `#/erp/teach` (new hire), `#/panel`, `#/tutor`, `#/library`, `#/inbox`, `#/map/<workmap id>`.
+
 ## Who owns what
 
 Only edit files you own; change shared files together and push right away.
@@ -46,7 +48,7 @@ Only edit files you own; change shared files together and push right away.
 | Path | Owner |
 |---|---|
 | `server/**`, `src/agents/**`, `src/panel/**` | Renzo |
-| `src/erp/**`, `src/capture/**`, `src/screens/**`, `data/invoices.json`, `data/experts.json` | Pablo |
+| `src/erp/**`, `src/capture/**`, `src/screens/**`, `data/invoices.json`, `data/experts.json`, `data/seed/**` | Pablo |
 | `src/shared/**`, `src/App.tsx`, `src/styles.css`, `CLAUDE.md`, `README.md` | Shared |
 
 Git: `git pull` before starting, commit small, work on `main`. Generated session Work Maps (`data/workmaps/session-*.json`) and session logs are gitignored. Local test runs also modify `data/workmaps/sample-invoice-processing.json`: don't commit that; **Reset demo** restores it.
@@ -58,7 +60,37 @@ Git: `git pull` before starting, commit small, work on `main`. Generated session
 - **Tutor panel** (`src/panel/TutorPanel.tsx`): loads the newest confirmed real map (sample as fallback), sends it as `[WORKMAP]`, shows the expert's clip on a blocked save, flags gaps.
 - **Work Map:** steps (moment, decision, reason in the expert's words), guardrails with machine `check` rules (`violatedGuardrails()` in `src/shared/guardrails.ts`), open_questions, confirmed.
 - **Recording:** `MediaRecorder` → IndexedDB (`src/capture/recordings.ts`). `ClipPlayer` plays 3 s before to 10 s after a moment, 30 s max. Off-the-record spans are cut from the recording.
-- **Storage:** JSON files in `data/` via `server/store.ts`.
+- **Storage:** JSON files in `data/` via `server/store.ts`. The sample map `data/workmaps/sample-invoice-processing.json` has a pristine copy in `data/seed/`: **if you edit the sample, copy it to `data/seed/` too**, because Reset demo restores it from there.
+
+## Pablo's side: how it works and how to hook in
+
+### ERP (`src/erp/ErpPage.tsx`)
+- Loads invoices from `/api/invoices` (filtered by `phase`). Edits persist in localStorage per mode until Reset demo.
+- Events it publishes (`t = Date.now()`):
+  - `invoice_opened` when an invoice is clicked.
+  - `field_change`: selects (cost center, approval, status) fire immediately; text fields (asset no., note) fire **once on blur**, not per keystroke.
+  - `keystroke`: at most one per field per second, field name only, never the text.
+  - `save` with `field: "status", from, to`. Saving an "open" invoice posts it.
+  - `guardrail_blocked` (teach mode only) with `field = guardrail id` and `note = guardrail text`.
+- Teach mode picks its Work Map with the same rule as the tutor: newest confirmed non-sample map, else newest non-sample, else the sample. It reloads the map on window focus so a Gap Loop patch applies without a refresh.
+- Capture mode never blocks a save.
+
+### Capture (`src/capture/`)
+- `useScreenRecorder()`: `start(sessionId)` opens the screen picker and returns the start time (use it as the session zero point); `stop()` resolves once the recording is stored. Also `offRecord`, `setOffRecord(on)`, `offRecordSpans()`, `grabFrame()` (null while off the record).
+- Recordings live in **IndexedDB** in the browser (`recordings.ts`), keyed by session id, with their off-the-record spans. No server route; any tab on localhost:5173 can replay them. Clearing site data deletes them.
+- `<ClipPlayer at={clip_s} sessionId? />`: plays from 3 s before to 10 s after (max 30 s). Falls back to the newest recording if the session has none. Maps session time to video time around off-record spans (the paused footage is not in the file).
+- **Off the record**: the ERP shows a floating button while a recording runs. It talks to the recorder over BroadcastChannel `"understudy-capture"` (`control.ts`: `state`, `request`, `ping`). While off: the recorder is paused (no footage), the ERP publishes **no events**, and the ERP shows a striped banner.
+
+### Screens (`src/screens/`)
+- **Work Map** (`#/map/<id>`): step timeline; click a step to see its clip, decision, reason and guardrails. Reloads on focus.
+- **Library** (`#/library`): one card per map with counts, new-hire mastery and an open-question badge; polls every 3 s. Two static stub cards. **Reset demo** button lives here.
+- **Expert Minute** (`#/inbox`): open questions sorted by `asked_by_count`. "Start voice session" → `setPendingQuickAsk()` + opens `#/panel` (the panel reads it with `takePendingQuickAsk()` from `quickAsk.ts`). "Answer in text" POSTs `/api/patch` directly (cut-list fallback).
+- **Mastery panel** (shown in `#/erp/teach`): `progress.ts` records blocked guardrails and saved invoices in localStorage. A step is "practice next" if any of its guardrails blocked a save, "mastered" if a saved invoice fell under one of its guardrails with no block.
+- **Reset demo** (`resetDemo.ts`): clears ERP edits, mastery progress, pending Quick Ask and recordings, and PUTs the sample map back from `data/seed/`. It does **not** delete Work Maps made by capture sessions: before the real demo, delete old ones from `data/workmaps/` (keep the sample) so the ERP and tutor don't teach from a rehearsal map.
+
+### Styles
+- `src/styles.css` (shared) holds the design tokens: Inter, `--accent` indigo, `--ok/--warn/--bad` (+ `-soft`), `--radius`, `--shadow`, `--ring`, `--page-pad`. Use the tokens instead of hex colors.
+- The ERP root is `.erp-app` (own look in `src/erp/erp.css`); screens use `src/screens/screens.css` (`.pill`, `.meter`, `button.primary`, `button.quiet`, `mark.gr`).
 
 ### API (`server/`)
 
@@ -93,3 +125,4 @@ Claude goes through **MIT Parley** (Anthropic-compatible; the key does NOT start
 - Keys only in `.env`. Never commit `.env` or paste keys in chat.
 - Personal fields (IBAN, contact) render with class `pii` (blurred) and are never sent to Claude.
 - Gap questions never reveal who asked.
+- When you change how something works, update this file in the same commit so the other person's Claude picks it up.
