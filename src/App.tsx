@@ -33,6 +33,12 @@ export function App() {
   const [page, arg] = route.split("/");
 
   // Live session routes (Renzo): no navigation, they run in the small companion window on desktop.
+  if (route === "learner/assistant")
+    return (
+      <main className="session-main">
+        <TutorPanel />
+      </main>
+    );
   if (route === "work/live" || route === "work/record")
     return (
       <main className="session-main">

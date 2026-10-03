@@ -7,11 +7,15 @@ import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
 import { AGENT_NAME, TUTOR_FIRST_MESSAGE, TUTOR_PROMPT } from "../agents/prompts";
 import { ClipPlayer } from "../capture/ClipPlayer";
-import { getJson, postJson, putJson } from "../shared/api";
+import { getJson, postJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
 import type { Invoice, OpenQuestion, Step, WorkMap } from "../shared/types";
+import { useScreenWatch, type FrameResult } from "./useScreenWatch";
+import "./session.css";
 
 const EXPERT_FIRST_NAME = "Sabrina";
+/** The learner using this Assistant (their questions show up in their own Expert Minute). */
+export const LEARNER = "Lena";
 
 /** "Sabrina never showed me this" and similar. */
 const GAP_RE = /(never|didn'?t|did not|hasn'?t|has not)\s+(show|shown|showed|teach|taught|tell|told|explain|explained)/i;
@@ -79,46 +83,33 @@ function Tutor() {
 
   const stepForGuardrail = (gid: string) => mapRef.current?.steps.find((s) => s.guardrails.includes(gid)) ?? null;
 
-  /** Flag a case the map doesn't cover: route it to an expert and add it to the map's open questions. */
+  /** What the learner last said or typed: the best wording for a question. */
+  const lastLearnerText = useRef<string | null>(null);
+
+  /** Flag a case the map doesn't cover: the server routes it to an expert and merges duplicates. */
   const flagGap = async (invoiceId: string | null, hint?: string) => {
     const m = mapRef.current;
-    const key = invoiceId ?? hint ?? "general";
+    const key = invoiceId ?? hint ?? lastLearnerText.current ?? "general";
     if (!m || flaggedInvoices.current.has(key)) return "Already flagged.";
     flaggedInvoices.current.add(key);
     const inv = invoicesRef.current.find((i) => i.id === invoiceId);
     const context = inv ? describeInvoice(inv) : undefined;
-    const question = hint ?? (inv ? `How should an invoice like ${describeInvoice(inv)} be handled?` : "A case the Work Map doesn't cover.");
+    const question =
+      hint ??
+      lastLearnerText.current ??
+      (inv ? `How should an invoice like ${describeInvoice(inv)} be handled?` : "A case the Work Map doesn't cover.");
     note(`flagging gap: ${question.slice(0, 80)}`);
     try {
-      const latest = await getJson<WorkMap>(`/api/workmaps/${m.id}`);
-      const open = latest.open_questions.filter((q) => q.status === "open");
-      const routed = await postJson<{
-        expert_name: string;
-        reason: string;
-        neutral_question: string;
-        duplicate_of: string | null;
-      }>("/api/route", { question, context, open: open.map((q) => ({ id: q.id, q: q.q })) });
-      const same = open.find((q) => q.id === routed.duplicate_of);
-      if (same) {
-        same.asked_by_count += 1;
-        note(`merged into an existing question, now asked by ${same.asked_by_count}`);
-      }
-      else {
-        const q: OpenQuestion = {
-          id: `q-${Date.now()}`,
-          q: routed.neutral_question,
-          context,
-          asked_by_count: 1,
-          route_to: routed.expert_name,
-          route_reason: routed.reason,
-          status: "open",
-        };
-        latest.open_questions.push(q);
-      }
-      setMap(await putJson<WorkMap>(`/api/workmaps/${latest.id}`, latest));
-      setFlagged((f) => [...f, `${routed.neutral_question} → ${routed.expert_name}`]);
-      note(`flagged for ${routed.expert_name}`);
-      return `Flagged for ${routed.expert_name}.`;
+      const r = await postJson<{ question: OpenQuestion; merged: boolean; map_id: string }>("/api/questions", {
+        question,
+        context,
+        asker: LEARNER,
+        mapId: m.id,
+      });
+      setMap(await getJson<WorkMap>(`/api/workmaps/${r.map_id}`));
+      setFlagged((f) => [...f, `${r.question.q} → ${r.question.route_to ?? "an expert"}${r.merged ? ` (asked by ${r.question.asked_by_count})` : ""}`]);
+      note(r.merged ? `merged, now asked by ${r.question.asked_by_count}` : `flagged for ${r.question.route_to}`);
+      return `Flagged for ${r.question.route_to ?? "an expert"}.`;
     } catch (e) {
       flaggedInvoices.current.delete(key);
       setError(`Could not flag the question: ${String(e)}`);
@@ -142,6 +133,7 @@ function Tutor() {
     onError: (message) => note(`error: ${String(message)}`),
     onMessage: ({ message, role }) => {
       setTranscript((t) => [...t, { t: Date.now() - t0.current, who: role === "agent" ? "tutor" : "new hire", text: message }]);
+      if (role !== "agent") lastLearnerText.current = message;
       // Backups that don't depend on client tools being set up in the dashboard:
       if (role !== "agent" && GAP_RE.test(message)) flagGap(currentInvoice.current);
       if (role === "agent" && /\bflagged\b/i.test(message)) flagGap(currentInvoice.current);
@@ -218,7 +210,31 @@ function Tutor() {
     if (connected) conv.current.changeInputDevice({ inputDeviceId: id }).catch((e) => note(`mic switch failed: ${e}`));
   };
 
-  const start = () => {
+  // Watch the screen (any app): context for tips; a decision in progress gets one tip if a rule applies.
+  const lastTipAt = useRef(0);
+  const watch = useScreenWatch((r: FrameResult) => {
+    if (conv.current.status !== "connected") return;
+    conv.current.sendContextualUpdate(`[SCREEN] ${r.app}: ${[...r.changes, r.task_done ?? ""].filter(Boolean).join("; ")}`);
+    if (r.judgment_call && Date.now() - lastTipAt.current > 20_000) {
+      lastTipAt.current = Date.now();
+      conv.current.sendUserMessage(`[DECIDING] In ${r.app}, the learner seems to be deciding: ${r.judgment_call}.`);
+      note(`tip nudge: ${r.judgment_call}`);
+    }
+  });
+
+  const [typed, setTyped] = useState("");
+  const ask = () => {
+    const text = typed.trim();
+    if (!text || conv.current.status !== "connected") return;
+    setTyped("");
+    lastLearnerText.current = text;
+    setTranscript((t) => [...t, { t: Date.now() - t0.current, who: "new hire", text }]);
+    conv.current.sendUserMessage(text);
+    if (GAP_RE.test(text)) flagGap(currentInvoice.current, text);
+  };
+
+  const start = async () => {
+    await watch.start(); // optional: the assistant also works with the ERP and voice only
     setError(null);
     t0.current = Date.now();
     conversation.startSession({
@@ -242,14 +258,14 @@ function Tutor() {
   if (!import.meta.env.VITE_TUTOR_AGENT_ID)
     return (
       <div className="panel">
-        <h2>Tutor</h2>
+        <h2>Assistant</h2>
         <p className="error">Add the Tutor agent ID as VITE_TUTOR_AGENT_ID in .env.development, then restart the app.</p>
       </div>
     );
 
   return (
     <div className="panel">
-      <h2>Tutor</h2>
+      <h2>Assistant</h2>
       <p className="muted">
         {map
           ? `Teaching from: ${map.workflow} (${map.expert}${map.confirmed ? ", confirmed" : ", draft"}${map.sample ? ", sample" : ""})`
@@ -271,10 +287,10 @@ function Tutor() {
           </button>
         )}
         {connected ? (
-          <button onClick={() => conversation.endSession()}>Stop</button>
+          <button onClick={() => { conversation.endSession(); watch.stop(); }}>Stop</button>
         ) : (
           <button onClick={start} disabled={!map}>
-            Start tutor
+            Start assistant
           </button>
         )}
       </div>
@@ -293,6 +309,30 @@ function Tutor() {
             <q>{clipStep.reason}</q> <span className="muted">{map.expert}</span>
           </p>
         </section>
+      )}
+
+      {connected && (
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            ask();
+          }}
+        >
+          <input
+            id="assistant-ask"
+            style={{ flex: 1, minWidth: 0 }}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={`Ask ${AGENT_NAME} anything about the work…`}
+          />
+          <button type="submit" disabled={!typed.trim()}>
+            Ask
+          </button>
+        </form>
+      )}
+      {(watch.watching || watch.error) && (
+        <p className="muted small">{watch.watching ? "Watching your screen for tips (nothing is recorded)." : watch.error}</p>
       )}
 
       {flagged.length > 0 && (
