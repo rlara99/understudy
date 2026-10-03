@@ -50,7 +50,7 @@ Git: `git pull` before starting, commit small, push at each checkpoint (0:20, 1:
 - `POST /api/route` `{ question, context? }` → `{ expert_name, reason, neutral_question }`
 - `POST /api/patch` `{ workmapId, questionId, answer, expert }` → updated map
 
-Claude calls live in `server/claude.ts`. Models: `claude-opus-5-5` for map/route/patch, `claude-haiku-4-5` for frames (speed). Override with `MAP_MODEL` / `FRAME_MODEL`.
+Claude calls go through MIT Parley (`ANTHROPIC_BASE_URL=https://parley.api.mit.edu`, Parley key in `ANTHROPIC_API_KEY`); `server/env.ts` makes `.env` win over shell variables. Claude calls live in `server/claude.ts`. Models: `claude-opus-5-5` for map/route/patch, `claude-haiku-4-5` for frames (speed). Override with `MAP_MODEL` / `FRAME_MODEL`.
 
 ## ElevenLabs
 

@@ -1,5 +1,5 @@
 // Owner: Renzo. Small API server; Vite proxies /api here.
-import "dotenv/config";
+import "./env";
 import express, { type ErrorRequestHandler } from "express";
 import { aiRoutes } from "./routes/ai";
 import { dataRoutes } from "./routes/data";
