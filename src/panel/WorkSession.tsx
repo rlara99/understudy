@@ -27,6 +27,8 @@ interface FrameResult {
 }
 
 const EXPERT = "Sabrina M.";
+/** "Let's debrief" as speech-to-text tends to write it (debrief, de-brief, be brief, the brief). */
+const DEBRIEF_RE = /\b(de-?\s?brief(ing)?|let'?s (be|the) brief|time (to|for) (the |a )?(de)?brief)\b/i;
 const NAME_RE = new RegExp(`\\b(${AGENT_NAME}|cloudia|klaudia|claudio|clodia)\\b`, "i");
 /** While the ERP sends exact events, skip vision (cheaper, and no double questions). */
 const ERP_QUIET_MS = 10_000;
@@ -125,13 +127,13 @@ function Session({ mode }: { mode: Mode }) {
           return;
         }
         // "Let's debrief": save this session and open Debrief & teach in the main window.
-        if (/\bdebrief(ing)?\b/i.test(message)) {
+        if (DEBRIEF_RE.test(message)) {
           note("debrief requested by voice");
           finishRef.current?.(true);
           return;
         }
         pause.current.activity();
-        mic.hold(3000); // she may reply: keep noise out until she has
+        mic.hold(2000); // she may reply: keep noise out until she has
         if (NAME_RE.test(message)) {
           const heardAt = Date.now();
           setTimeout(() => {
