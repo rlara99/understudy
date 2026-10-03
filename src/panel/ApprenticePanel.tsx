@@ -83,6 +83,8 @@ function Panel() {
   }, []);
 
   const screen = useScreenRecorder();
+  const offRecordRef = useRef(screen.offRecord);
+  offRecordRef.current = screen.offRecord;
   const startRef = useRef(Date.now());
   const pause = useRef(new PauseDetector());
   const lastAgentSpeech = useRef(0);
@@ -126,7 +128,7 @@ function Panel() {
   const priming = () => phaseRef.current === "debrief" || phaseRef.current === "quickask";
 
   const conversation = useConversation({
-    micMuted: !allowInterrupt && agentSpeaking,
+    micMuted: screen.offRecord || (!allowInterrupt && agentSpeaking),
     onAgentToolRequest: (props) => note(`agent tool call: ${JSON.stringify(props).slice(0, 160)}`),
     onInterruption: () => note("agent was interrupted (mic picked up sound)"),
     onModeChange: ({ mode }) => {
@@ -148,6 +150,13 @@ function Panel() {
     },
     onDisconnect: (details) => note(`disconnected: ${JSON.stringify(details).slice(0, 160)}`),
     onMessage: ({ message, role }) => {
+      if (offRecordRef.current) return; // off the record: nothing is kept
+      // Saying "off the record" pauses everything (coming back is the button, since the mic is muted).
+      if (role !== "agent" && /\boff the record\b/i.test(message) && !/\bback on\b/i.test(message)) {
+        screen.setOffRecord(true);
+        note("off the record (spoken)");
+        return;
+      }
       const line: TranscriptLine = {
         t: Date.now() - startRef.current,
         speaker: role === "agent" ? "agent" : "expert",
@@ -199,6 +208,23 @@ function Panel() {
     if (changes.length === 0) return;
     pendingTaskDone.current = `[TASK DONE] The expert finished ${invoice}. Changes they made: ${changes.join("; ")}.`;
   };
+
+  // Tell the agent (silently) when the expert goes off / back on the record.
+  const wasOff = useRef(false);
+  useEffect(() => {
+    if (screen.offRecord === wasOff.current) return;
+    wasOff.current = screen.offRecord;
+    if (screen.offRecord) {
+      pendingTaskDone.current = null;
+      note("off the record: mic muted, nothing logged");
+    } else note("back on the record");
+    if (conv.current.status !== "connected") return;
+    conv.current.sendContextualUpdate(
+      screen.offRecord
+        ? "[OFF RECORD] The expert went off the record. Don't ask about or mention anything until [ON RECORD]."
+        : "[ON RECORD] The expert is back on the record.",
+    );
+  }, [screen.offRecord]);
 
   // ERP events -> agent context (silent) + task tracking
   useEffect(() => {
@@ -273,7 +299,7 @@ function Panel() {
   useEffect(() => {
     if (!connected || phase !== "capture") return;
     const id = setInterval(() => {
-      if (conv.current.isSpeaking) return;
+      if (conv.current.isSpeaking || offRecordRef.current) return;
       if (pendingTaskDone.current) {
         const nudge = pendingTaskDone.current;
         pendingTaskDone.current = null;
@@ -331,7 +357,8 @@ function Panel() {
     startAgent("live");
   };
 
-  const saveSession = () => putJson(`/api/sessions/${logRef.current.id}`, logRef.current);
+  const saveSession = () =>
+    putJson(`/api/sessions/${logRef.current.id}`, { ...logRef.current, off_record: screen.offRecordSpans() });
 
   /** End the live session, store the recording, and build the draft Work Map. */
   const finishTask = async () => {
@@ -535,6 +562,11 @@ function Panel() {
           ) : (
             <button onClick={startCapture}>{log.events.length ? "Resume capture" : "Start capture"}</button>
           ))}
+        {phase === "capture" && (connected || screen.recording) && (
+          <button onClick={() => screen.setOffRecord(!screen.offRecord)} aria-pressed={screen.offRecord}>
+            {screen.offRecord ? "Back on the record" : "Off the record"}
+          </button>
+        )}
         {phase === "capture" && (
           <button onClick={finishTask} disabled={log.events.length === 0}>
             Finish task
@@ -555,6 +587,9 @@ function Panel() {
           </>
         )}
       </p>
+      {screen.offRecord && (
+        <p className="error">Off the record: mic muted, nothing recorded or logged. Press "Back on the record" to resume.</p>
+      )}
       {(error || screen.error) && <p className="error">{error ?? screen.error}</p>}
       {gaps.length > 0 && (
         <>

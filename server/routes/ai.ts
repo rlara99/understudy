@@ -81,6 +81,7 @@ The transcript continues after the task with a spoken debrief (lines with t >= $
 Use the expert's own words for every reason and guardrail quote. Times are mm:ss from the recording start (event t is in ms); a step's moment.clip_s is the seconds into the recording where it happened.
 Guardrail text: one plain rule a new hire can follow, under 15 words. Never mention checks, fields, data or the system in it.
 Give every guardrail a machine check whenever you can: if every "when" condition holds and "require" does not, the save is blocked. Invoice fields: ${INVOICE_FIELDS}. If the rule depends on something not in these fields (for example "equipment"), approximate it with the fields you have (for example amount gt 5000 and currency eq EUR) instead of leaving the check out.
+off_record lists time spans (ms) the expert took off the record. Never use anything from inside them: no steps, reasons, quotes or gaps.
 List as "gaps" the questions a new hire would still need answered: missing reasons, unclear limits, exceptions you saw but were not explained. Each gap is ONE short spoken question, under 20 words. Max 5, most important first.${debriefNote}`,
     user: JSON.stringify({ events: log.events, transcript: log.transcript, off_record: log.off_record ?? [] }),
   });
