@@ -18,7 +18,7 @@ export class PauseDetector {
   asked = 0;
 
   constructor(
-    private opts: PauseRuleOptions = { idleMs: 3000, decisionWindowMs: 30000, maxQuestions: 4, minGapMs: 15000 },
+    private opts: PauseRuleOptions = { idleMs: 1500, decisionWindowMs: 30000, maxQuestions: 4, minGapMs: 15000 },
   ) {}
 
   /** Typing, clicking or speaking. */
@@ -26,10 +26,10 @@ export class PauseDetector {
     this.lastActivity = now;
   }
 
-  /** A value changed in a way worth asking about, e.g. "cost center 4711 -> 0400 on INV-4471". */
+  /** A value changed in a way worth asking about, e.g. "cost center 4711 -> 0400 on INV-4471".
+   *  Idle time still counts from the last keystroke, not from this call. */
   decision(summary: string, now = Date.now()): void {
     this.lastDecision = now;
-    this.lastActivity = now;
     this.pending = summary;
   }
 

@@ -3,6 +3,7 @@
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
 import { PauseDetector } from "../agents/pauseRule";
+import { AGENT_NAME, INTERVIEWER_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
 import { formatMs, onErpEvent } from "../shared/bus";
 import { putJson } from "../shared/api";
 import type { ErpEvent, SessionLog, TranscriptLine } from "../shared/types";
@@ -94,7 +95,7 @@ function Panel() {
         const timer = setTimeout(() => {
           pending.delete(key);
           if (event.from !== event.to) record(event);
-        }, 1200);
+        }, 700);
         pending.set(key, { event, timer });
         return;
       }
@@ -124,7 +125,9 @@ function Panel() {
     conversation.startSession({
       agentId: import.meta.env.VITE_INTERVIEWER_AGENT_ID,
       connectionType: "webrtc",
-      dynamicVariables: { mode, expert_name: "Sabrina" },
+      dynamicVariables: { mode, expert_name: "Sabrina", agent_name: AGENT_NAME },
+      // Prompts come from src/agents/prompts.ts (needs overrides enabled in the agent's Security tab).
+      overrides: { agent: { prompt: { prompt: INTERVIEWER_PROMPT }, firstMessage: INTERVIEWER_FIRST_MESSAGE } },
     });
   };
 

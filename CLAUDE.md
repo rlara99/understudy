@@ -56,7 +56,7 @@ Claude calls live in `server/claude.ts`. Models: `claude-opus-5-5` for map/route
 
 - Two agents in the dashboard: Interviewer and Tutor. Prompts and first messages are in `src/agents/prompts.ts`; paste them in.
 - Agents must be public (no auth) so the browser can start a session with just the agent ID.
-- Interviewer dynamic variables: `mode` (live | debrief | quick_ask), `expert_name`. Tutor: `expert_name`.
+- Dynamic variables: `agent_name`, `expert_name`, plus `mode` (live | debrief | quick_ask) for the Interviewer.
 - Enable the `skip_turn` system tool on the Interviewer.
 - Tutor client tools (define in the dashboard with the same names): `replay_moment { clip_s }`, `flag_open_question { question, context }`, `get_guardrails {}`.
 - Message prefixes the agents understand: `[SCREEN]` (context update, never spoken to), `[PAUSE]`, `[GAPS]`, `[QUESTION]`, `[WORKMAP]`, `[BLOCKED]`.
