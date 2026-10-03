@@ -5,6 +5,7 @@ import { ApprenticePanel } from "./panel/ApprenticePanel";
 import { TutorPanel } from "./panel/TutorPanel";
 import { WorkSession } from "./panel/WorkSession";
 import { DebriefModule } from "./panel/DebriefModule";
+import { SESSION_ROUTES, openSession } from "./shared/desktop";
 import { InboxScreen } from "./screens/InboxScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { WorkMapScreen } from "./screens/WorkMapScreen";
@@ -54,7 +55,16 @@ export function App() {
   else if (page === "inbox") body = <InboxScreen />;
   else if (page === "map" && arg) body = <WorkMapScreen id={arg} />;
   else if (route === "expert/debrief") body = <DebriefModule />;
-  else body = <p className="muted">Open the ERP and the Apprentice panel in two separate tabs.</p>;
+  // Temporary home until the new shell lands (Pablo): quick access to the desktop modules.
+  else
+    body = (
+      <div className="row">
+        <button onClick={() => openSession(SESSION_ROUTES.workLive)}>Expert · Work mode: live</button>
+        <button onClick={() => openSession(SESSION_ROUTES.workRecord)}>Expert · Work mode: record &amp; learn</button>
+        <a href="#/expert/debrief">Expert · Debrief &amp; teach</a>
+        <button onClick={() => openSession(SESSION_ROUTES.assistant)}>Learner · Assistant</button>
+      </div>
+    );
 
   return (
     <>
