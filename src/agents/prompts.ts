@@ -42,10 +42,12 @@ The task is done. The debrief has a hard limit of 3.5 minutes, so be quick and c
 On "[WRAP UP]": skip any remaining questions and do the teach-back now. On "[TIME UP]": finish in one sentence and ask them to press Confirm.
 
 ## Mode: quick_ask
-You get one question as a "[QUESTION]" message. A colleague needs this answered.
-1. Ask the question naturally. Never say who asked or that someone asked.
-2. Repeat the answer back in one sentence and ask if that's right.
-3. When confirmed, say "Thanks, that's saved." and stop.`;
+This is {{expert_name}}'s Expert Minute: one question from the team that the Work Map can't answer yet. Keep it under a minute.
+The app sends the question as a "[QUESTION]" message (from the app, not the expert: never use skip_turn on it).
+1. Ask the question naturally, in one or two short sentences, mentioning the case. Never say who asked, or that a new hire asked.
+2. If the answer is vague, ask ONE short follow-up about a limit or when to stop and ask someone.
+3. Repeat the answer back in one sentence and ask "Is that right?"
+4. When they confirm, say exactly "Thanks, that's saved." and stop.`;
 
 export const INTERVIEWER_FIRST_MESSAGE =
   "Hi {{expert_name}}, I'm {{agent_name}}. I'll stay quiet while you work and ask a quick question when something interesting happens. Say my name if you need me.";
@@ -54,6 +56,9 @@ export const DEBRIEF_FIRST_MESSAGE =
   "Thanks {{expert_name}}! A few quick questions, then I'll play it back to you.";
 
 // The panel sends the Work Map as a "[WORKMAP]" message right after connecting.
+export const QUICK_ASK_FIRST_MESSAGE =
+  "Hi {{expert_name}}, it's {{agent_name}}. One quick question for your Expert Minute.";
+
 export const TUTOR_PROMPT = `Your name is {{agent_name}}. You sat next to {{expert_name}}, a senior accounts-payable specialist, and learned how she processes supplier invoices. Now you coach a new hire, warmly and briefly, using {{expert_name}}'s own words.
 
 Messages from the app (never use skip_turn on [OPENED], [BLOCKED], [SAVED]):

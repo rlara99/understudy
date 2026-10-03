@@ -5,13 +5,20 @@
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
 import { IMPORTANT_FIELDS, PauseDetector } from "../agents/pauseRule";
-import { AGENT_NAME, DEBRIEF_FIRST_MESSAGE, INTERVIEWER_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
+import {
+  AGENT_NAME,
+  DEBRIEF_FIRST_MESSAGE,
+  INTERVIEWER_FIRST_MESSAGE,
+  INTERVIEWER_PROMPT,
+  QUICK_ASK_FIRST_MESSAGE,
+} from "../agents/prompts";
 import { useScreenRecorder } from "../capture/useScreenRecorder";
+import { takePendingQuickAsk, type PendingQuickAsk } from "../screens/quickAsk";
 import { postJson, putJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
 import type { ErpEvent, SessionLog, TranscriptLine, WorkMap } from "../shared/types";
 
-type Phase = "capture" | "mapping" | "ready" | "debrief" | "confirming" | "done";
+type Phase = "capture" | "mapping" | "ready" | "debrief" | "confirming" | "done" | "quickask" | "patching" | "qadone";
 
 const WORKFLOW = { workflow: "Supplier invoice processing", expert: "Sabrina M.", team: "Accounts payable" };
 
@@ -61,6 +68,19 @@ function Panel() {
   const [allowInterrupt, setAllowInterrupt] = useState(false);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [debriefSecs, setDebriefSecs] = useState(0);
+  const [quickAsk, setQuickAsk] = useState<PendingQuickAsk | null>(null);
+  const quickAskRef = useRef(quickAsk);
+  quickAskRef.current = quickAsk;
+  /** Transcript length when the Quick Ask started; the expert's lines after it are the answer. */
+  const quickAskFrom = useRef(0);
+
+  // Opened from the Expert Minute inbox: pick up the handed-over question.
+  useEffect(() => {
+    const qa = takePendingQuickAsk();
+    if (!qa) return;
+    setQuickAsk(qa);
+    setPhase("quickask");
+  }, []);
 
   const screen = useScreenRecorder();
   const startRef = useRef(Date.now());
@@ -94,6 +114,17 @@ function Panel() {
     note("debrief: gaps sent");
   };
 
+  /** Quick Ask: hand the agent the question once the greeting is done. */
+  const sendQuestion = () => {
+    const qa = quickAskRef.current;
+    if (debriefStage.current === 2 || !qa) return;
+    debriefStage.current = 2;
+    conv.current.sendUserMessage(`[QUESTION] ${qa.question}${qa.context ? ` (Case: ${qa.context})` : ""}`);
+    note("quick ask: question sent");
+  };
+  const prime = () => (phaseRef.current === "quickask" ? sendQuestion() : sendGaps());
+  const priming = () => phaseRef.current === "debrief" || phaseRef.current === "quickask";
+
   const conversation = useConversation({
     micMuted: !allowInterrupt && agentSpeaking,
     onAgentToolRequest: (props) => note(`agent tool call: ${JSON.stringify(props).slice(0, 160)}`),
@@ -102,17 +133,17 @@ function Panel() {
       if (mode === "speaking") lastAgentSpeech.current = Date.now();
       setAgentSpeaking(mode === "speaking");
       note(`agent ${mode}`);
-      // In the debrief, send the gaps once the greeting has finished.
-      if (phaseRef.current === "debrief") {
+      // Debrief / Quick Ask: send the gaps or the question once the greeting has finished.
+      if (priming()) {
         if (mode === "speaking" && debriefStage.current === 0) debriefStage.current = 1;
-        else if (mode === "listening" && debriefStage.current === 1) sendGaps();
+        else if (mode === "listening" && debriefStage.current === 1) prime();
       }
     },
     onConnect: () => {
-      if (phaseRef.current !== "debrief") return;
+      if (!priming()) return;
       // Fallback in case the greeting events don't arrive.
       setTimeout(() => {
-        if (phaseRef.current === "debrief" && !conv.current.isSpeaking) sendGaps();
+        if (priming() && !conv.current.isSpeaking) prime();
       }, 8000);
     },
     onDisconnect: (details) => note(`disconnected: ${JSON.stringify(details).slice(0, 160)}`),
@@ -123,6 +154,10 @@ function Panel() {
         text: message,
       };
       setLog((l) => ({ ...l, transcript: [...l.transcript, line] }));
+      // Quick Ask: the agent confirms with "that's saved" once the expert agreed.
+      if (role === "agent" && phaseRef.current === "quickask" && /that.?s saved/i.test(message)) {
+        setTimeout(() => saveQuickAsk(), 1500);
+      }
       if (role === "agent") return;
       pause.current.activity();
       // The expert called the agent by name. If it hasn't started answering, tell it explicitly.
@@ -258,17 +293,23 @@ function Panel() {
     return () => clearInterval(id);
   }, [connected, phase]);
 
-  const startAgent = (mode: "live" | "debrief") =>
+  const startAgent = (mode: "live" | "debrief" | "quick_ask") =>
     conversation.startSession({
       agentId: import.meta.env.VITE_INTERVIEWER_AGENT_ID,
       connectionType: "webrtc",
-      dynamicVariables: { mode, expert_name: "Sabrina", agent_name: AGENT_NAME },
+      dynamicVariables: {
+        mode,
+        // A Quick Ask goes to whichever expert the question was routed to.
+        expert_name: mode === "quick_ask" ? (quickAskRef.current?.expert ?? "Sabrina").split(" ")[0] : "Sabrina",
+        agent_name: AGENT_NAME,
+      },
       inputDeviceId: micId || undefined,
       // Prompts come from src/agents/prompts.ts (overrides are enabled in the agent's Security tab).
       overrides: {
         agent: {
           prompt: { prompt: INTERVIEWER_PROMPT },
-          firstMessage: mode === "debrief" ? DEBRIEF_FIRST_MESSAGE : INTERVIEWER_FIRST_MESSAGE,
+          firstMessage:
+            mode === "debrief" ? DEBRIEF_FIRST_MESSAGE : mode === "quick_ask" ? QUICK_ASK_FIRST_MESSAGE : INTERVIEWER_FIRST_MESSAGE,
         },
       },
     });
@@ -386,7 +427,46 @@ function Panel() {
     }
   };
 
-  const busy = phase === "mapping" || phase === "confirming";
+  const startQuickAsk = () => {
+    setError(null);
+    debriefStage.current = 0;
+    quickAskFrom.current = logRef.current.transcript.length;
+    startRef.current = Date.now();
+    startAgent("quick_ask");
+  };
+
+  /** Turn the expert's spoken answer into a Work Map patch (new step + guardrails), clearing the question. */
+  const saveQuickAsk = async () => {
+    const qa = quickAskRef.current;
+    if (!qa || phaseRef.current !== "quickask") return;
+    const answer = logRef.current.transcript
+      .slice(quickAskFrom.current)
+      .filter((l) => l.speaker === "expert")
+      .map((l) => l.text)
+      .join(" ")
+      .trim();
+    if (!answer) {
+      setError("No spoken answer captured yet. Answer the question, then press Save answer.");
+      return;
+    }
+    setPhase("patching");
+    phaseRef.current = "patching";
+    if (conv.current.status === "connected") conv.current.endSession();
+    try {
+      await postJson<WorkMap>("/api/patch", {
+        workmapId: qa.workmapId,
+        questionId: qa.questionId,
+        answer,
+        expert: qa.expert ?? WORKFLOW.expert,
+      });
+      setPhase("qadone");
+    } catch (e) {
+      setError(`Could not save the answer: ${String(e)}`);
+      setPhase("quickask");
+    }
+  };
+
+  const busy = phase === "mapping" || phase === "confirming" || phase === "patching";
 
   return (
     <div className="panel">
@@ -416,6 +496,32 @@ function Panel() {
           Let me interrupt {AGENT_NAME}
         </label>
       </div>
+      {(phase === "quickask" || phase === "patching" || phase === "qadone") && quickAsk && (
+        <section className="card">
+          <b>Expert Minute{quickAsk.expert ? ` · for ${quickAsk.expert}` : ""}</b>
+          <span>{quickAsk.question}</span>
+          {quickAsk.context && <span className="muted">{quickAsk.context}</span>}
+          <div className="row">
+            {phase === "quickask" &&
+              (connected ? (
+                <>
+                  <button onClick={saveQuickAsk}>Save answer</button>
+                  <button onClick={() => conversation.endSession()}>Stop</button>
+                </>
+              ) : (
+                <button onClick={startQuickAsk}>Start Quick Ask</button>
+              ))}
+            {phase === "patching" && <span className="muted">Adding the answer to the Work Map…</span>}
+            {phase === "qadone" && (
+              <>
+                <span>Saved. The Work Map now covers this case.</span>
+                <a href="#/library">Library</a>
+                <a href={`#/map/${quickAsk.workmapId}`}>Work Map</a>
+              </>
+            )}
+          </div>
+        </section>
+      )}
       {phase === "debrief" && (
         <p className={debriefSecs >= 180 ? "error" : "muted"}>
           Debrief {formatMs(debriefSecs * 1000)} / 03:30
