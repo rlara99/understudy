@@ -177,6 +177,8 @@ Claude goes through **MIT Parley** (Anthropic-compatible; the key does NOT start
 - Voice answers are messy transcripts; the patch uses the agent's confirmed repeat-back to store a clean answer.
 - Pablo's files use CRLF line endings; normalize before string-matching edits.
 - Starting a terminal-panel tab from Claude can time out; starting `npm run dev` in the background from Bash works.
+- **Electron binary missing after `npm install`** (`node_modules/electron/dist/electron.exe` absent, install takes ~3 s): npm's allow-scripts skipped Electron's download step. Run `node node_modules/electron/install.js` once.
+- **Blank page with "Invalid hook call" / two React copies** (`react.js?v=…` and `react-dom_client.js?v=…` from different builds) after installing packages while pages are open: stop the app, delete `node_modules/.vite`, restart, then fully reload every window (a hash change is not a reload).
 
 ## Rules
 
