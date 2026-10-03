@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}</style>
+</head>
+<body>
+<title>Understudy Build Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one 16:9 sheet at a time on a cool desk, faint process-map grid; stacks into a scroll of cards on phones.
+   Ink-navy text, cobalt for the voice agent, highlighter yellow for guardrails, green = confirmed, coral = gaps. */
+:root{
+  --paper:#eef1f5; --sheet:#ffffff; --ink:#111a2c; --muted:#56617a; --rule:#d5dbe6;
+  --accent:#2747d0; --accent-soft:#e3e8fb; --hl:#ffe45c; --on-hl:#2a2300;
+  --ok:#0f7a55; --ok-soft:#dcf2e8; --gap:#c7432c; --gap-soft:#fbe4df;
+  --display:"Archivo","Arial Black",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0b101c; --sheet:#131a2a; --ink:#e7ebf4; --muted:#9aa4ba; --rule:#28324a;
+  --accent:#8aa0ff; --accent-soft:#1d2747; --hl:#f0d54a; --on-hl:#1d1800;
+  --ok:#4fcf9f; --ok-soft:#12302a; --gap:#ff8b72; --gap-soft:#3a1d18; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0b101c; --sheet:#131a2a; --ink:#e7ebf4; --muted:#9aa4ba; --rule:#28324a;
+  --accent:#8aa0ff; --accent-soft:#1d2747; --hl:#f0d54a; --on-hl:#1d1800;
+  --ok:#4fcf9f; --ok-soft:#12302a; --gap:#ff8b72; --gap-soft:#3a1d18; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--body)}
+.deck{min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-inline:16px;padding-block:16px 76px}
+.slide{width:min(100%,calc((100dvh - 108px) * 16 / 9));aspect-ratio:16/9;container-type:inline-size;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;box-shadow:0 1px 2px rgba(10,20,40,.06),0 12px 40px rgba(10,20,40,.08);position:relative;overflow:hidden}
+@media (min-width:761px){.slide:not(.active){display:none}}
+.in{--u:1cqw;--xs:calc(var(--u)*1.0);--s:calc(var(--u)*1.18);--b:calc(var(--u)*1.42);--l:calc(var(--u)*1.75);
+  position:absolute;inset:0;padding:calc(var(--u)*3.2) calc(var(--u)*4.2) calc(var(--u)*2.4);display:flex;flex-direction:column;gap:calc(var(--u)*1.5);font-size:var(--b);line-height:1.45;overflow:auto}
+.in.grid{background-image:linear-gradient(color-mix(in srgb,var(--rule) 40%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--rule) 40%,transparent) 1px,transparent 1px);background-size:calc(var(--u)*2.5) calc(var(--u)*2.5)}
+p,h1,h2,h3,dl,dd,ul,ol{margin:0}
+ul,ol{padding-left:1.1em}
+.eyebrow{font-family:var(--mono);font-size:var(--xs);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-stretch:125%;font-weight:850;font-size:calc(var(--u)*7.4);line-height:.95;letter-spacing:-.015em}
+h2{font-family:var(--display);font-stretch:118%;font-weight:800;font-size:calc(var(--u)*3.0);line-height:1.05;letter-spacing:-.01em;text-wrap:balance;max-width:28ch}
+h3{font-family:var(--display);font-stretch:112%;font-weight:750;font-size:var(--l);line-height:1.15}
+.lede{font-size:var(--l);line-height:1.35;color:var(--muted);max-width:44ch;text-wrap:pretty}
+.small{font-size:var(--s)}
+.xs{font-size:var(--xs)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+.head{display:flex;flex-direction:column;gap:calc(var(--u)*.7)}
+.foot{margin-top:auto;display:flex;justify-content:space-between;font-family:var(--mono);font-size:var(--xs);color:var(--muted);padding-top:calc(var(--u)*.6);border-top:1px solid var(--rule);font-variant-numeric:tabular-nums}
+mark.g{background:linear-gradient(transparent 10%,var(--hl) 10%,var(--hl) 90%,transparent 90%);color:var(--on-hl);padding:0 .25em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.t{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);color:var(--accent);padding:.05em .4em;border-radius:3px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;font-family:var(--mono);font-size:var(--xs);padding:.15em .6em;border-radius:99px;white-space:nowrap;border:1px solid transparent}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.gap{background:var(--gap-soft);color:var(--gap)}
+.pill.ac{background:var(--accent-soft);color:var(--accent)}
+.pill.line{border-color:var(--rule);color:var(--muted)}
+.box{border:1px solid var(--rule);border-radius:5px;background:var(--sheet);padding:calc(var(--u)*1.2)}
+.who{font-family:var(--mono);font-size:var(--xs);letter-spacing:.06em;text-transform:uppercase}
+.who.ag{color:var(--accent)} .who.ex{color:var(--ok)} .who.nh{color:var(--gap)}
+q{quotes:"\201C" "\201D"}
+
+/* slide 1 */
+.hero{flex:1;display:grid;grid-template-columns:1.05fr 1fr;gap:calc(var(--u)*4);align-items:center}
+.hero-l{display:flex;flex-direction:column;gap:calc(var(--u)*1.8)}
+.stepcard{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:calc(var(--u)*1.6);box-shadow:0 10px 30px rgba(10,20,40,.08);display:flex;flex-direction:column;gap:calc(var(--u)*1)}
+.sc-head{display:flex;justify-content:space-between;align-items:center;font-size:var(--xs);gap:1em}
+.sc-title{font-family:var(--display);font-stretch:112%;font-weight:750;font-size:var(--l);line-height:1.15}
+.stepcard dl{display:grid;grid-template-columns:auto 1fr;gap:calc(var(--u)*.7) calc(var(--u)*1.4);font-size:var(--s)}
+.stepcard dt{font-family:var(--mono);font-size:var(--xs);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:.2em}
+.stepcard dd{min-width:0}
+
+/* slide 2 */
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--u)*1.6);flex:1}
+.mod{display:flex;flex-direction:column;gap:calc(var(--u)*.9);border-top:3px solid var(--ink);padding-top:calc(var(--u)*1)}
+.mod .num{font-family:var(--display);font-stretch:125%;font-weight:850;font-size:calc(var(--u)*3.2);line-height:1;color:var(--accent)}
+.req{background:var(--paper);border-radius:4px;padding:calc(var(--u)*1);font-size:var(--s)}
+.req b{font-family:var(--mono);font-size:var(--xs);letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:.3em;color:var(--muted);font-weight:600}
+.take{font-size:var(--s);border-left:3px solid var(--accent);padding-left:calc(var(--u)*.9)}
+.take b{color:var(--accent)}
+
+/* slide 3 */
+.two{display:grid;grid-template-columns:1fr 1.25fr;gap:calc(var(--u)*3);flex:1;align-items:center}
+.line{display:flex;align-items:center;gap:calc(var(--u)*.6);flex-wrap:wrap}
+.nd{border:1.5px solid var(--ink);border-radius:4px;padding:.35em .7em;font-family:var(--mono);font-size:var(--s);background:var(--sheet)}
+.nd.dead{border-style:dashed;color:var(--muted);border-color:var(--muted)}
+.arr{color:var(--muted);font-family:var(--mono)}
+.loop svg{width:100%;height:auto;display:block}
+.loop text{font-family:var(--mono)}
+.lp-node{fill:var(--sheet);stroke:var(--ink);stroke-width:1.5}
+.lp-node.new{fill:var(--gap-soft);stroke:var(--gap)}
+.lp-lbl{fill:var(--ink);font-size:14px;font-weight:600}
+.lp-lbl.new{fill:var(--gap)}
+.lp-arc{fill:none;stroke:var(--muted);stroke-width:2}
+.lp-arc.new{stroke:var(--gap);stroke-dasharray:6 5}
+.ah{fill:var(--muted)} .ah.new{fill:var(--gap)}
+.lp-mid{fill:var(--muted);font-size:12px}
+
+/* slide 4 */
+.lib{display:grid;grid-template-columns:2.15fr 1fr;gap:calc(var(--u)*2.2);flex:1;min-height:0}
+.app{border:1px solid var(--rule);border-radius:6px;background:var(--paper);padding:calc(var(--u)*1.3);display:flex;flex-direction:column;gap:calc(var(--u)*1.1);min-width:0}
+.app-bar{display:flex;align-items:center;gap:calc(var(--u)*1);flex-wrap:wrap}
+.app-bar .nm{font-family:var(--display);font-stretch:112%;font-weight:750;font-size:var(--b)}
+.search{flex:1;min-width:0;display:flex;align-items:center;gap:.6em;background:var(--sheet);border:1px solid var(--rule);border-radius:99px;padding:.35em .9em;font-size:var(--s);color:var(--muted)}
+.mic{width:1.4em;height:1.4em;border-radius:50%;background:var(--accent);flex:none;display:grid;place-items:center}
+.mic::after{content:"";width:.35em;height:.6em;border-radius:.2em;background:var(--sheet)}
+.wfs{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--u)*.9)}
+.wf{background:var(--sheet);border:1px solid var(--rule);border-radius:5px;padding:calc(var(--u)*1);display:flex;flex-direction:column;gap:calc(var(--u)*.5);min-width:0}
+.wf-top{display:flex;gap:.4em;flex-wrap:wrap}
+.wf-name{font-weight:600;font-size:var(--s);line-height:1.25}
+.wf-by,.wf-m{font-size:var(--xs);color:var(--muted)}
+.wf-st{font-family:var(--mono);font-size:var(--xs)}
+.bar{height:calc(var(--u)*.45);background:var(--rule);border-radius:99px;overflow:hidden;margin-top:auto}
+.bar span{display:block;height:100%;background:var(--ok)}
+.askbtn{margin-top:auto;font-family:var(--mono);font-size:var(--xs);color:var(--gap);border:1px solid var(--gap);border-radius:4px;padding:.25em .5em;align-self:flex-start}
+.gr-row{display:flex;flex-direction:column;gap:calc(var(--u)*.5)}
+.chips{display:flex;flex-wrap:wrap;gap:calc(var(--u)*.5)}
+.gchip{font-size:var(--xs);background:var(--sheet);border:1px solid var(--rule);border-radius:4px;padding:.25em .55em}
+.gchip i{font-style:normal;display:inline-block;width:.6em;height:.6em;background:var(--hl);border-radius:1px;margin-right:.4em;vertical-align:.05em}
+.callouts{display:flex;flex-direction:column;gap:calc(var(--u)*1.3);min-width:0}
+.co{display:flex;flex-direction:column;gap:.25em;font-size:var(--s)}
+.co h3{font-size:var(--b)}
+
+/* slide 5 */
+.steps4{display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--u)*1.2);flex:1}
+.st{display:flex;flex-direction:column;gap:calc(var(--u)*.8);min-width:0}
+.st-n{display:flex;align-items:center;gap:.6em}
+.st-n span{font-family:var(--display);font-stretch:125%;font-weight:850;font-size:calc(var(--u)*2.4);line-height:1;color:var(--gap)}
+.st-n::after{content:"";flex:1;height:2px;background:var(--rule)}
+.st:last-child .st-n span{color:var(--ok)}
+.bub{background:var(--paper);border-radius:6px;padding:calc(var(--u)*.9);font-size:var(--s);display:flex;flex-direction:column;gap:.3em}
+.bub.ag{background:var(--accent-soft)}
+.why{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*2);font-size:var(--s)}
+
+/* slide 6 */
+.map{display:grid;grid-template-columns:1fr 1.15fr;gap:calc(var(--u)*2.4);flex:1;min-height:0}
+.fields{display:flex;flex-direction:column;gap:calc(var(--u)*.75);font-size:var(--s)}
+.fields li{padding-left:.2em}
+.fields li::marker{color:var(--accent)}
+pre.code{margin:0;background:var(--paper);border:1px solid var(--rule);border-radius:5px;padding:calc(var(--u)*1.1);font-family:var(--mono);font-size:calc(var(--u)*1.02);line-height:1.5;overflow:auto;min-width:0;tab-size:2}
+.code .k{color:var(--accent)} .code .c{color:var(--muted)} .code .h{background:var(--hl);color:var(--on-hl)}
+
+/* slide 7 */
+.lanes{display:flex;flex-direction:column;gap:calc(var(--u)*1.05);flex:1}
+.lane{display:grid;grid-template-columns:calc(var(--u)*8.5) 1fr;gap:calc(var(--u)*1.2);align-items:center}
+.lane-l{font-family:var(--display);font-stretch:112%;font-weight:750;font-size:var(--b);line-height:1.1}
+.lane-l small{display:block;font-family:var(--mono);font-weight:400;font-size:var(--xs);color:var(--muted);font-stretch:100%}
+.chain{display:flex;align-items:stretch;gap:calc(var(--u)*.4);min-width:0}
+.cn{flex:1;min-width:0;border:1px solid var(--rule);border-radius:4px;background:var(--sheet);padding:calc(var(--u)*.6) calc(var(--u)*.8);font-size:var(--xs);line-height:1.35}
+.cn b{display:block;font-size:var(--s);font-weight:600}
+.cn.ag{border-color:var(--accent);background:var(--accent-soft)}
+.cn.cl{border-style:solid;border-color:var(--ink)}
+.cn.gp{border-color:var(--gap);background:var(--gap-soft)}
+.ed{flex:none;display:flex;flex-direction:column;justify-content:center;align-items:center;font-family:var(--mono);font-size:calc(var(--u)*.8);color:var(--muted);max-width:calc(var(--u)*8.5);text-align:center;line-height:1.2}
+.ed::before{content:"\2192";font-size:calc(var(--u)*1.6);color:var(--ink);line-height:1}
+.lane.gap .lane-l{color:var(--gap)}
+
+/* tables */
+.tw{overflow-x:auto;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:var(--s)}
+th{font-family:var(--mono);font-size:var(--xs);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);text-align:left;font-weight:500;padding:0 calc(var(--u)*.8) calc(var(--u)*.5) 0;border-bottom:1.5px solid var(--ink)}
+td{vertical-align:top;padding:calc(var(--u)*.6) calc(var(--u)*.8) calc(var(--u)*.6) 0;border-bottom:1px solid var(--rule);line-height:1.38}
+td:first-child{font-weight:600}
+.num-c{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* slide 9 */
+.el{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:calc(var(--u)*1.6);flex:1;min-height:0}
+.agent{display:flex;flex-direction:column;gap:calc(var(--u)*.7);font-size:var(--s)}
+.agent .av{display:flex;align-items:center;gap:.6em}
+.agent .dot{width:calc(var(--u)*2.2);height:calc(var(--u)*2.2);border-radius:50%;background:var(--accent);flex:none}
+.agent .dot.tu{background:var(--ok)}
+.agent ul{display:flex;flex-direction:column;gap:.3em}
+.note{border:1px dashed var(--gap);border-radius:5px;padding:calc(var(--u)*.9);font-size:var(--s);color:var(--ink)}
+.note b{color:var(--gap)}
+
+/* slide 10 */
+.plan{display:flex;flex-direction:column;flex:1;min-height:0}
+.pr{display:grid;grid-template-columns:calc(var(--u)*6) calc(var(--u)*11) 1fr calc(var(--u)*20);gap:calc(var(--u)*1.2);padding-block:calc(var(--u)*.55);border-bottom:1px solid var(--rule);font-size:var(--s);align-items:baseline}
+.pr.hd{font-family:var(--mono);font-size:var(--xs);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1.5px solid var(--ink)}
+.pr .h{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
+.pr .bk{font-weight:600}
+.pr .dn{color:var(--muted)}
+.cut{display:flex;gap:.8em;align-items:baseline;font-size:var(--xs);color:var(--gap);padding-block:calc(var(--u)*.45);border-bottom:1px dashed var(--gap);font-family:var(--mono)}
+.cut b{flex:none}
+
+/* slide 11 */
+.seed{display:grid;grid-template-columns:2fr 1fr;gap:calc(var(--u)*2.4);flex:1;min-height:0}
+.bs{display:flex;flex-direction:column;gap:calc(var(--u)*1.2);font-size:var(--s)}
+.bs ul{display:flex;flex-direction:column;gap:.3em}
+.bs h3{font-size:var(--b)}
+.skip li{color:var(--muted)}
+
+/* slide 12 */
+.script{display:flex;flex-direction:column;flex:1}
+.sr{display:grid;grid-template-columns:calc(var(--u)*7) calc(var(--u)*12) 1fr;gap:calc(var(--u)*1.4);padding-block:calc(var(--u)*.75);border-bottom:1px solid var(--rule);font-size:var(--s);align-items:baseline}
+.sr .tm{font-family:var(--mono);color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.sr .bk{font-family:var(--display);font-stretch:112%;font-weight:750;font-size:var(--b)}
+.sr.hl{background:var(--gap-soft);margin-inline:calc(var(--u)*-.8);padding-inline:calc(var(--u)*.8);border-radius:4px}
+
+/* slide 13 */
+.path{display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--u)*1.2);flex:1;align-items:stretch}
+.pp{display:flex;flex-direction:column;gap:calc(var(--u)*.8);padding:calc(var(--u)*1.2);border-radius:6px;border:1px solid var(--rule);background:var(--sheet);font-size:var(--s);position:relative}
+.pp:first-child{border:2px solid var(--ink)}
+.pp:last-child{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+.pp:last-child .who{color:var(--hl)}
+.pp .proof{margin-top:auto;font-size:var(--xs);border-top:1px solid color-mix(in srgb,currentColor 25%,transparent);padding-top:.6em;opacity:.85}
+
+/* nav */
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;gap:14px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(6px);border-top:1px solid var(--rule);font-family:var(--mono);font-size:13px;color:var(--muted)}
+.nav button{font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--rule);border-radius:5px;padding:6px 14px;cursor:pointer}
+.nav button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.nav button:disabled{opacity:.4;cursor:default}
+.nav button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#lbl{min-width:0;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+#cnt{font-variant-numeric:tabular-nums}
+.kbd{opacity:.7}
+
+/* phones: stack every slide as a card */
+@media (max-width:760px){
+  .deck{padding-block:16px;gap:16px;justify-content:flex-start}
+  .slide{aspect-ratio:auto;width:100%}
+  .in{position:relative;inset:auto;--u:10px;padding:22px 18px 16px;overflow:visible}
+  h1{font-size:52px}
+  h2{font-size:27px}
+  .hero,.cols3,.two,.lib,.steps4,.why,.map,.el,.seed,.path,.wfs{grid-template-columns:1fr}
+  .lane{grid-template-columns:1fr}
+  .chain{flex-direction:column}
+  .ed{flex-direction:row;gap:.5em;max-width:none}
+  .ed::before{content:"\2193"}
+  .pr{grid-template-columns:5em 1fr}
+  .pr .wk,.pr .dn{grid-column:1 / -1}
+  .pr.hd{display:none}
+  .sr{grid-template-columns:4.5em 1fr}
+  .sr>p:last-child{grid-column:1 / -1}
+  .nav{display:none}
+}
+@media (prefers-reduced-motion:no-preference){
+  .slide.active .in>*{animation:rise .35s ease-out both}
+  .slide.active .in>*:nth-child(2){animation-delay:.04s}
+  .slide.active .in>*:nth-child(3){animation-delay:.08s}
+}
+@keyframes rise{from{transform:translateY(6px)}to{transform:none}}
+</style>
+
+<main class="deck" id="deck">
+
+<!-- 1 -->
+<section class="slide active" id="s1" data-title="Understudy">
+<div class="in grid">
+  <div class="eyebrow">Hack-Nation · Challenge 01 · The AI Apprentice · built on ElevenLabs</div>
+  <div class="hero">
+    <div class="hero-l">
+      <h1>Under&shy;study</h1>
+      <p class="lede">An AI apprentice that learns from the expert, coaches the new hire, and goes back to ask about whatever it doesn't know yet.</p>
+      <p class="small muted">Working name. Build plan for one hackathon day on ElevenLabs Creator + Claude.</p>
+    </div>
+    <div class="stepcard" aria-label="Example Work Map step">
+      <div class="sc-head"><span class="mono muted">Work Map · step 4 of 7</span><span class="pill ok">Confirmed by Sabine</span></div>
+      <div class="sc-title">Code the invoice to a cost center</div>
+      <dl>
+        <dt>Moment</dt><dd><span class="t">03:12</span> INV-4471, cost center field</dd>
+        <dt>Decision</dt><dd><span class="mono">4711 opex → 0400 capex</span></dd>
+        <dt>Reason</dt><dd><q>Equipment over €5,000 is always capex.</q> <span class="muted">Sabine, live question at <span class="t">03:15</span></span></dd>
+        <dt>Guardrails</dt><dd><mark class="g">No asset number, no capex booking.</mark><br><mark class="g">Unknown supplier: stop, ask the controller.</mark></dd>
+      </dl>
+    </div>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>01 / 13</span></div>
+</div>
+</section>
+
+<!-- 2 -->
+<section class="slide" id="s2" data-title="What the judges must see">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">The brief, compressed</div>
+    <h2>Three modules, each with a hard bar. These come first.</h2>
+  </div>
+  <div class="cols3">
+    <div class="mod">
+      <div class="num">1</div>
+      <h3>Capture</h3>
+      <p class="small">The expert shares their screen and does a real task. A voice agent listens in a side panel and asks why at natural pauses.</p>
+      <div class="req"><b>Required</b>At least 3 questions, each at a pause and about something on screen. At least one is about a guardrail.</div>
+      <p class="take"><b>Our take:</b> our own fake ERP reports exact field changes, so every question lands on the right moment.</p>
+    </div>
+    <div class="mod">
+      <div class="num">2</div>
+      <h3>Map</h3>
+      <p class="small">A short spoken debrief turns the session into a clickable Work Map: moment, decision, reason, guardrails.</p>
+      <div class="req"><b>Required</b>At least 3 new follow-ups, then a teach-back the expert confirms. Every step links to a screen moment and the expert's words.</div>
+      <p class="take"><b>Our take:</b> each guardrail is also compiled into a rule the ERP can check when someone clicks Save.</p>
+    </div>
+    <div class="mod">
+      <div class="num">3</div>
+      <h3>Teach</h3>
+      <p class="small">A voice tutor watches the new hire work, explains steps the expert's way, and steps in before a guardrail breaks.</p>
+      <div class="req"><b>Required</b>On a case the expert never showed, catch a wrong decision before it's saved and explain it with the expert's reasoning.</div>
+      <p class="take"><b>Our take:</b> cases the map can't answer go back to the expert as questions. That's the Gap Loop.</p>
+    </div>
+  </div>
+  <p class="small muted">Also required in the demo: answers to the 5 "Apprentice Test" questions, and a final moonshot slide.</p>
+  <div class="foot"><span>Understudy · build deck</span><span>02 / 13</span></div>
+</div>
+</section>
+
+<!-- 3 -->
+<section class="slide" id="s3" data-title="Where we differ">
+<div class="in grid">
+  <div class="head">
+    <div class="eyebrow">Differentiation</div>
+    <h2>Most teams will build a line. We build a loop.</h2>
+  </div>
+  <div class="two">
+    <div style="display:flex;flex-direction:column;gap:calc(var(--u)*1.4)">
+      <div class="who" style="color:var(--muted)">Most teams</div>
+      <div class="line">
+        <span class="nd">Capture</span><span class="arr">→</span><span class="nd">Map</span><span class="arr">→</span><span class="nd">Teach</span><span class="arr">→</span><span class="nd dead">end</span>
+      </div>
+      <p class="small muted">The knowledge stops growing the day the expert recorded it. When the new hire meets a case nobody showed, the tutor guesses or says nothing.</p>
+      <div class="who" style="color:var(--gap);margin-top:calc(var(--u)*1)">Understudy</div>
+      <p>Every case the new hire hits that the map can't answer becomes a <b>question for the expert</b>. A 60-second voice check-in answers it, and the map updates.</p>
+      <p class="small muted">So the library grows where people actually get stuck, not where someone guessed they would.</p>
+    </div>
+    <div class="loop" role="img" aria-label="Loop: Capture, Map, Teach, Ask back, then Capture again">
+      <svg viewBox="0 0 400 300">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+          <marker id="ahn" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah new" d="M0 0L10 5L0 10z"/></marker>
+        </defs>
+        <path class="lp-arc" d="M259 50 A140 110 0 0 1 327 104" marker-end="url(#ah)"/>
+        <path class="lp-arc" d="M327 197 A140 110 0 0 1 259 250" marker-end="url(#ah)"/>
+        <path class="lp-arc new" d="M141 250 A140 110 0 0 1 73 197" marker-end="url(#ahn)"/>
+        <path class="lp-arc new" d="M73 104 A140 110 0 0 1 141 50" marker-end="url(#ahn)"/>
+        <rect class="lp-node" x="145" y="20" width="110" height="40" rx="4"/>
+        <text class="lp-lbl" x="200" y="45" text-anchor="middle">Capture</text>
+        <rect class="lp-node" x="285" y="130" width="110" height="40" rx="4"/>
+        <text class="lp-lbl" x="340" y="155" text-anchor="middle">Map</text>
+        <rect class="lp-node" x="145" y="240" width="110" height="40" rx="4"/>
+        <text class="lp-lbl" x="200" y="265" text-anchor="middle">Teach</text>
+        <rect class="lp-node new" x="5" y="130" width="110" height="40" rx="4"/>
+        <text class="lp-lbl new" x="60" y="155" text-anchor="middle">Ask back</text>
+        <text class="lp-mid" x="200" y="140" text-anchor="middle">gaps from new hires</text>
+        <text class="lp-mid" x="200" y="158" text-anchor="middle">become the next capture</text>
+      </svg>
+    </div>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>03 / 13</span></div>
+</div>
+</section>
+
+<!-- 4 -->
+<section class="slide" id="s4" data-title="The Know-how Library">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">The new hire's home screen</div>
+    <h2>The Know-how Library shows what it knows and what it doesn't</h2>
+  </div>
+  <div class="lib">
+    <div class="app" aria-label="Library mockup">
+      <div class="app-bar">
+        <span class="nm">Library</span>
+        <div class="search"><span class="mic" aria-hidden="true"></span><span>Ask: "What if the supplier is unknown?"</span></div>
+      </div>
+      <div class="wfs">
+        <div class="wf">
+          <div class="wf-top"><span class="pill ok">Confirmed</span><span class="pill gap">1 open</span></div>
+          <div class="wf-name">Supplier invoice processing</div>
+          <div class="wf-by">Sabine M. · Accounts payable</div>
+          <div class="wf-st">7 steps · 3 calls · 4 guardrails</div>
+          <div class="bar"><span style="width:60%"></span></div>
+          <div class="wf-m">Lena: 60% mastered</div>
+        </div>
+        <div class="wf">
+          <div class="wf-top"><span class="pill ok">Confirmed</span></div>
+          <div class="wf-name">Month-end accrual check</div>
+          <div class="wf-by">Sabine M. · Accounts payable</div>
+          <div class="wf-st">5 steps · 2 calls · 2 guardrails</div>
+          <div class="bar"><span style="width:0%"></span></div>
+          <div class="wf-m">Lena: not started</div>
+        </div>
+        <div class="wf">
+          <div class="wf-top"><span class="pill gap">Needs capture</span></div>
+          <div class="wf-name">Supplier bank detail change</div>
+          <div class="wf-by">Jonas K. · Vendor master data</div>
+          <div class="wf-st">2 open questions · no session yet</div>
+          <span class="askbtn">Ask Jonas →</span>
+        </div>
+      </div>
+      <div class="gr-row">
+        <div class="eyebrow">Guardrails across all workflows</div>
+        <div class="chips">
+          <span class="gchip"><i></i>No asset number → no capex booking</span>
+          <span class="gchip"><i></i>Unknown supplier → stop, ask controller</span>
+          <span class="gchip"><i></i>Czech subsidiary → second approval</span>
+          <span class="gchip"><i></i>December invoice from Brandt → hold</span>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><h3>Coverage you can see</h3><p class="muted">Step, judgment-call and guardrail counts on every card. The growth is the demo.</p></div>
+      <div class="co"><h3>Guardrails stand alone</h3><p class="muted">Search them by voice. Each answer plays the expert's own words and screen moment.</p></div>
+      <div class="co"><h3>Open questions are a feature</h3><p class="muted">The coral badge is what the library doesn't know yet, and who to ask.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>04 / 13</span></div>
+</div>
+</section>
+
+<!-- 5 -->
+<section class="slide" id="s5" data-title="The Gap Loop">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">The hero moment of the demo</div>
+    <h2>The Gap Loop: a case nobody showed becomes a new step in two minutes</h2>
+  </div>
+  <div class="steps4">
+    <div class="st">
+      <div class="st-n"><span>1</span></div>
+      <p class="small"><b>Lena opens INV-5103</b>: $3,400 in USD from Ridgeline Tools, a US supplier. Sabine never showed a foreign-currency invoice.</p>
+      <div class="bub ag"><span class="who ag">Tutor</span><q>Sabine never showed me a USD invoice. I've flagged it for her. Park it in Held for now.</q></div>
+    </div>
+    <div class="st">
+      <div class="st-n"><span>2</span></div>
+      <p class="small"><b>The flag lands in Sabine's queue</b> as an open question, with Lena's screen moment attached. The library card shows a coral badge.</p>
+      <div class="bub"><span class="who nh">Open question</span>How are USD invoices booked, and is there a limit?</div>
+    </div>
+    <div class="st">
+      <div class="st-n"><span>3</span></div>
+      <p class="small"><b>Quick Ask.</b> The interviewer agent runs a 60-second voice check-in: shows the moment, asks, repeats the answer back.</p>
+      <div class="bub"><span class="who ex">Sabine</span><q>Convert at the ECB rate on the invoice date. Over $10,000, the treasury team signs off.</q></div>
+    </div>
+    <div class="st">
+      <div class="st-n"><span>4</span></div>
+      <p class="small"><b>The map patches itself</b>: one new step, one new guardrail, badge cleared. Lena reopens the invoice.</p>
+      <div class="bub ag"><span class="who ag">Tutor</span><q>Sabine just told me how this works. What rate would you use here?</q></div>
+    </div>
+  </div>
+  <div class="why">
+    <p><b>Why it wins:</b> it shows two of the brief's moonshots, "living company memory" and "always-on apprentice", working live instead of on the last slide.</p>
+    <p><b>Why it's cheap:</b> Quick Ask is the Capture agent with a different prompt and no screen share. About 90 minutes on top of the required modules.</p>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>05 / 13</span></div>
+</div>
+</section>
+
+<!-- 6 -->
+<section class="slide" id="s6" data-title="One data model">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">Work Map JSON</div>
+    <h2>One JSON file feeds the map, the tutor and the library</h2>
+  </div>
+  <div class="map">
+    <div style="display:flex;flex-direction:column;gap:calc(var(--u)*1.4);min-width:0">
+      <ol class="fields">
+        <li><b>moment</b>: timestamp plus a frame and a clip offset, for replay.</li>
+        <li><b>decision</b>: what changed on screen, from the ERP's own events.</li>
+        <li><b>reason</b>: the expert's own words, with the time they said them.</li>
+        <li><b>guardrails</b>: plain-language rule plus a machine <span class="mono">check</span>.</li>
+        <li><b>open_questions</b>: what the map can't answer yet. This drives the Gap Loop.</li>
+      </ol>
+      <div class="box small"><b>The trick is <span class="mono">check</span>.</b> During Map, Claude turns each guardrail into a simple rule the fake ERP evaluates on Save. The tutor's catch is instant and reliable, and its explanation still comes from <span class="mono">reason</span>.</div>
+      <p class="small muted">Free stretch goal: export this file as agent instructions ("agent-ready guardrails"). About 30 minutes.</p>
+    </div>
+<pre class="code"><span class="k">"workflow"</span>: "Supplier invoice processing",
+<span class="k">"expert"</span>: "Sabine M.",  <span class="k">"confirmed"</span>: true,
+<span class="k">"steps"</span>: [{
+  <span class="k">"id"</span>: "s4",
+  <span class="k">"title"</span>: "Code invoice to cost center",
+  <span class="k">"moment"</span>: { <span class="k">"t"</span>: "03:12", <span class="k">"clip_s"</span>: 192 },
+  <span class="k">"decision"</span>: "4711 (opex) → 0400 (capex)",
+  <span class="k">"reason"</span>: "Equipment over €5,000 is always capex.",
+  <span class="k">"said_at"</span>: "03:15",
+  <span class="k">"guardrails"</span>: ["g1", "g2"]
+}],
+<span class="k">"guardrails"</span>: [{
+  <span class="k">"id"</span>: "g1",
+  <span class="k">"text"</span>: "No asset number, no capex booking",
+  <span class="h"><span class="k">"check"</span>: { "if": "cost_center == '0400'",
+             "require": "asset_no" }</span>
+}],
+<span class="k">"open_questions"</span>: [{
+  <span class="k">"q"</span>: "How are USD invoices booked?",
+  <span class="k">"from"</span>: "Lena · INV-5103", <span class="k">"ask"</span>: "Sabine M."
+}]</pre>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>06 / 13</span></div>
+</div>
+</section>
+
+<!-- 7 -->
+<section class="slide" id="s7" data-title="How it's wired">
+<div class="in grid">
+  <div class="head">
+    <div class="eyebrow">Architecture</div>
+    <h2>How it's wired: one web app, two voice agents, two Claude calls</h2>
+  </div>
+  <div class="lanes">
+    <div class="lane">
+      <div class="lane-l">Capture<small>expert's screen</small></div>
+      <div class="chain">
+        <div class="cn"><b>Fake ERP tab</b>Exact events: field changed, Save clicked, keystrokes. Screen share adds a frame every 1.5 s.</div>
+        <div class="ed">Broadcast&shy;Channel + /api/frame</div>
+        <div class="cn cl"><b>Apprentice panel</b>Event log, pause detector, question budget, MediaRecorder for replay. Claude Haiku 4.5 describes frames.</div>
+        <div class="ed">context updates + pause nudge</div>
+        <div class="cn ag"><b>Interviewer agent</b>ElevenAgents. Asks why, limits, when to stop.</div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Map<small>after the task</small></div>
+      <div class="chain">
+        <div class="cn"><b>Session log</b>Events + transcript + answers.</div>
+        <div class="ed">/api/map</div>
+        <div class="cn cl"><b>Claude Sonnet 5.5</b>Merges into steps, lists gaps, compiles <span class="mono">check</span> rules.</div>
+        <div class="ed">gaps</div>
+        <div class="cn ag"><b>Debrief</b>Interviewer asks the gaps, then teaches it back.</div>
+        <div class="ed">confirm</div>
+        <div class="cn"><b>Work Map JSON</b>Saved to the library.</div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-l">Teach<small>new hire's screen</small></div>
+      <div class="chain">
+        <div class="cn"><b>Same ERP tab</b>New hire works an unseen case.</div>
+        <div class="ed">Save hook</div>
+        <div class="cn cl"><b>Run check rules</b>Local and instant. Block the save on a violation.</div>
+        <div class="ed">violation</div>
+        <div class="cn ag"><b>Tutor agent</b>Explains with Sabine's reason, plays her clip, asks Lena to predict the fix.</div>
+      </div>
+    </div>
+    <div class="lane gap">
+      <div class="lane-l">Ask back<small>the Gap Loop</small></div>
+      <div class="chain">
+        <div class="cn gp"><b>No step matches</b>Tutor calls <span class="mono">flag_open_question</span>.</div>
+        <div class="ed">queue</div>
+        <div class="cn"><b>Library badge</b>Open question + moment.</div>
+        <div class="ed">Quick Ask</div>
+        <div class="cn ag"><b>Interviewer, 60 s</b>Asks, repeats back, expert confirms.</div>
+        <div class="ed">patch</div>
+        <div class="cn"><b>Map updated</b>Badge clears.</div>
+      </div>
+    </div>
+  </div>
+  <p class="xs muted">Stack: Vite + React + TypeScript, <span class="mono">@elevenlabs/react</span>, a small Node server with 2 routes so the Claude key never reaches the browser, and a JSON file as the database.</p>
+  <div class="foot"><span>Understudy · build deck</span><span>07 / 13</span></div>
+</div>
+</section>
+
+<!-- 8 -->
+<section class="slide" id="s8" data-title="The Apprentice Test">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">The 5 questions the demo must answer</div>
+    <h2>Our answer to each Apprentice Test question</h2>
+  </div>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:15%">Question</th><th style="width:52%">Mechanism</th><th>What the judge sees</th></tr></thead>
+    <tbody>
+      <tr><td>1 · When to ask</td><td>ERP keystrokes trigger <span class="mono">sendUserActivity</span>, which keeps the agent quiet. A pause means 3 s with no input or speech <i>and</i> a decision in the last 30 s. Only then does the panel send one nudge.</td><td>The agent never talks over typing. It asks right after a value changes.</td></tr>
+      <tr><td>2 · What to ask</td><td>Events are scored: changed default, hold or escalate, amount near a limit = high. Skip it if the screen already shows why. Budget: 4 live questions; the rest wait for the debrief.</td><td><q>You moved that one to capex. What made you do that?</q></td></tr>
+      <tr><td>3 · When it understood</td><td>Debrief loops until every step has a reason and every guardrail has a stop condition. Then teach-back. The expert says yes, and the map is stamped Confirmed.</td><td>A spoken correction edits the map live.</td></tr>
+      <tr><td>4 · New hire learned</td><td>Unseen €7,200 equipment invoice. The Save hook catches opex. A mastery panel at the end lists mastered and practice-next steps.</td><td>Catch, clip replay, fix, mastery score.</td></tr>
+      <tr><td>5 · Trust</td><td>An "Off the record" button or spoken phrase pauses frames and transcript (shown as a gap on the timeline). Fields tagged as personal are blurred before capture, plus regex on text.</td><td>A blurred IBAN in every frame and a redacted line in the transcript.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>08 / 13</span></div>
+</div>
+</section>
+
+<!-- 9 -->
+<section class="slide" id="s9" data-title="ElevenLabs Creator plan">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">Using your ElevenLabs Creator plan</div>
+    <h2>Two agents, a few client tools, and a careful minute budget</h2>
+  </div>
+  <div class="el">
+    <div class="agent box">
+      <div class="av"><span class="dot" aria-hidden="true"></span><h3>Interviewer</h3></div>
+      <p class="muted">Curious, patient voice. Expressive Mode if your plan has it.</p>
+      <ul>
+        <li>Prompt rule: speak only after a pause nudge; otherwise use the <span class="mono">skip_turn</span> system tool.</li>
+        <li>Max one question per pause, under 15 words.</li>
+        <li>Three modes through one dynamic variable: <span class="mono">live</span>, <span class="mono">debrief</span>, <span class="mono">quick_ask</span>.</li>
+      </ul>
+    </div>
+    <div class="agent box">
+      <div class="av"><span class="dot tu" aria-hidden="true"></span><h3>Tutor</h3></div>
+      <p class="muted">Warm and a little slower. The Work Map is loaded into its prompt when the session starts.</p>
+      <ul>
+        <li>Client tools: <span class="mono">replay_moment</span>, <span class="mono">flag_open_question</span>, <span class="mono">get_guardrails</span>.</li>
+        <li>Asks the new hire to predict before it explains.</li>
+        <li>Quotes the expert by name: <q>Sabine's rule is…</q></li>
+      </ul>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:calc(var(--u)*1);min-width:0">
+<pre class="code" style="font-size:calc(var(--u)*.92)"><span class="c">// panel.tsx: the 4 calls that matter</span>
+const c = useConversation({
+  clientTools: { replay_moment,
+                 flag_open_question }
+});
+await c.startSession({ agentId,
+  connectionType: "webrtc" });
+c.sendContextualUpdate(
+  "03:12 INV-4471 cc 4711→0400");
+c.sendUserActivity(); <span class="c">// typing</span>
+c.sendUserMessage(
+  "[PAUSE] ask about last decision");</pre>
+      <div class="note"><b>Minutes are metered on Creator.</b> Develop with text-only sessions and short calls, and keep voice for rehearsals. Check usage in the dashboard before the final demo.</div>
+      <p class="xs muted">Check the SDK docs for exact signatures; they change between versions.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>09 / 13</span></div>
+</div>
+</section>
+
+<!-- 10 -->
+<section class="slide" id="s10" data-title="Build plan for today">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">Build plan · assumes about 10 working hours</div>
+    <h2>Build in this order and stop at each cut line if you're behind</h2>
+  </div>
+  <div class="plan">
+    <div class="pr hd"><span>Hours</span><span>Block</span><span class="wk">Build</span><span class="dn">Done when</span></div>
+    <div class="pr"><span class="h">0–1</span><span class="bk">Setup</span><span class="wk">Vite app, Node server, both agents in the dashboard, fake ERP with seed invoices.</span><span class="dn">You can talk to the agent from the panel.</span></div>
+    <div class="pr"><span class="h">1–4</span><span class="bk">Capture</span><span class="wk">ERP events, context updates, pause detector, question budget, recording. Frame diff with Claude.</span><span class="dn">3 good questions in a 5-minute run.</span></div>
+    <div class="cut"><b>Cut line at hour 4:</b> drop vision frames and run on ERP events only. Questions still land correctly.</div>
+    <div class="pr"><span class="h">4–6</span><span class="bk">Map</span><span class="wk">/api/map, debrief mode, teach-back, timeline UI with clips.</span><span class="dn">Every step shows moment, reason, guardrails.</span></div>
+    <div class="pr"><span class="h">6–8</span><span class="bk">Teach</span><span class="wk">Tutor agent, Save hook with check rules, replay, mastery panel.</span><span class="dn">The €7,200 opex mistake gets caught.</span></div>
+    <div class="cut"><b>Cut line at hour 8:</b> ship the library as a static card grid and run Quick Ask as text instead of voice.</div>
+    <div class="pr"><span class="h">8–9</span><span class="bk">Library + loop</span><span class="wk">Card grid, open-question queue, Quick Ask mode, map patching.</span><span class="dn">The USD invoice loop works once end to end.</span></div>
+    <div class="pr"><span class="h">9–10</span><span class="bk">Demo</span><span class="wk">Record a backup video, rehearse the script twice, finish the moonshot slide.</span><span class="dn">The demo runs under 4 minutes.</span></div>
+  </div>
+  <p class="xs muted">With 3 people: A takes the voice agents and prompts, B the fake ERP, vision and replay, C the Work Map, library and pitch. Solo: go top to bottom.</p>
+  <div class="foot"><span>Understudy · build deck</span><span>10 / 13</span></div>
+</div>
+</section>
+
+<!-- 11 -->
+<section class="slide" id="s11" data-title="Seed data and scope">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">Keep it small</div>
+    <h2>Five fake invoices carry the whole demo</h2>
+  </div>
+  <div class="seed">
+    <div class="tw">
+    <table>
+      <thead><tr><th>Invoice</th><th>Supplier</th><th>Amount</th><th>Hidden judgment call</th><th>Used in</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">INV-4471</td><td>Hartmann Werkzeugbau GmbH</td><td class="num-c">€6,480</td><td>Drill press: recode 4711 → 0400 capex</td><td>Capture</td></tr>
+        <tr><td class="mono">INV-4472</td><td>Czech subsidiary (Brno)</td><td class="num-c">€1,950</td><td>Send for second approval</td><td>Capture</td></tr>
+        <tr><td class="mono">INV-4473</td><td>Brandt Logistik GmbH</td><td class="num-c">€2,310</td><td>Dated 12 Dec: hold, this supplier double-bills in December</td><td>Capture</td></tr>
+        <tr><td class="mono">INV-5102</td><td>Steiner Antriebstechnik</td><td class="num-c">€7,200</td><td>Servo motor: new hire picks opex, tutor catches it</td><td>Teach</td></tr>
+        <tr><td class="mono">INV-5103</td><td>Ridgeline Tools Inc.</td><td class="num-c">$3,400</td><td>Never shown: triggers the Gap Loop</td><td>Teach</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="bs">
+      <div><h3>Build</h3>
+        <ul>
+          <li>Your own fake ERP: one page, one form, one Save button</li>
+          <li>One expert and one workflow, plus two stub cards</li>
+          <li>JSON file storage</li>
+          <li>Blur on tagged fields, plus regex redaction</li>
+        </ul></div>
+      <div class="skip"><h3>Skip</h3>
+        <ul>
+          <li>Real ERP or WebArena</li>
+          <li>Logins and accounts</li>
+          <li>A real database</li>
+          <li>Presidio (pitch it as the next step)</li>
+          <li>German → English, unless it's hour 9 and all else works</li>
+        </ul></div>
+    </div>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>11 / 13</span></div>
+</div>
+</section>
+
+<!-- 12 -->
+<section class="slide" id="s12" data-title="Demo script">
+<div class="in">
+  <div class="head">
+    <div class="eyebrow">Demo script · about 3½ minutes, adjust to your slot</div>
+    <h2>One story, two judges, one loop</h2>
+  </div>
+  <div class="script">
+    <div class="sr"><span class="tm">0:00</span><span class="bk">Hook</span><p>Sabine retires in 18 months. Lena started Monday. The 2019 process document covers almost nothing.</p></div>
+    <div class="sr"><span class="tm">0:15</span><span class="bk">Capture</span><p>Judge plays Sabine on 3 invoices. The agent stays silent while she types, then asks 3 questions. One is a guardrail: <q>Is there a limit where you'd stop and ask someone?</q></p></div>
+    <div class="sr"><span class="tm">1:15</span><span class="bk">Map</span><p>Debrief asks 3 gaps, including <q>Is the December hold for every supplier?</q> Teach-back, one correction, then the Work Map appears.</p></div>
+    <div class="sr"><span class="tm">1:55</span><span class="bk">Teach</span><p>Second judge plays Lena on INV-5102 (€7,200) and picks opex. Save is blocked. The tutor asks why Sabine would stop here and plays her clip. Lena fixes it.</p></div>
+    <div class="sr hl"><span class="tm">2:35</span><span class="bk">Gap Loop</span><p>Lena opens the USD invoice. The tutor flags it, Sabine answers a 60-second Quick Ask, the badge clears, and the tutor coaches the retry.</p></div>
+    <div class="sr"><span class="tm">3:05</span><span class="bk">Moonshot</span><p>One slide: from one library to a living company memory.</p></div>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>12 / 13</span></div>
+</div>
+</section>
+
+<!-- 13 -->
+<section class="slide" id="s13" data-title="Moonshot">
+<div class="in grid">
+  <div class="head">
+    <div class="eyebrow">Last pitch slide</div>
+    <h2>From one library to the world's operations manual</h2>
+  </div>
+  <div class="path">
+    <div class="pp">
+      <span class="who ex">Today</span>
+      <h3>One expert, one library</h3>
+      <p>Capture, Map, Teach, plus a Gap Loop that grows the map from real new-hire questions.</p>
+      <p class="proof">Proves: knowledge can be captured by voice and kept current.</p>
+    </div>
+    <div class="pp">
+      <span class="who ag">Next</span>
+      <h3>Living company memory</h3>
+      <p>Every expert and every workflow in one map. When work changes, the apprentice asks only about what's new.</p>
+      <p class="proof">Already true: the Gap Loop only asks about missing pieces.</p>
+    </div>
+    <div class="pp">
+      <span class="who ag">Then</span>
+      <h3>People first, then agents</h3>
+      <p>Software agents load the same steps and <span class="mono">check</span> rules and take the routine steps. People keep the judgment calls.</p>
+      <p class="proof">Already true: guardrails are machine-checkable today.</p>
+    </div>
+    <div class="pp">
+      <span class="who">Moonshot</span>
+      <h3>The world's operations manual</h3>
+      <p>Anonymized Work Maps across thousands of companies, teaching anyone, anywhere, how digital work is really done.</p>
+      <p class="proof">Starts with: one retiring expert, one 10-minute session.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Understudy · build deck</span><span>13 / 13</span></div>
+</div>
+</section>
+
+</main>
+
+<nav class="nav" aria-label="Slide navigation">
+  <button id="prev" type="button" aria-label="Previous slide">← Prev</button>
+  <span id="cnt">1 / 13</span>
+  <span id="lbl">Understudy</span>
+  <button id="next" type="button" aria-label="Next slide">Next →</button>
+  <span class="kbd">← → keys</span>
+</nav>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var cnt=document.getElementById('cnt'),lbl=document.getElementById('lbl');
+  var i=0;
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('active',k===i)});
+    cnt.textContent=(i+1)+' / '+slides.length;
+    lbl.textContent=slides[i].dataset.title||'';
+    prev.disabled=i===0; next.disabled=i===slides.length-1;
+    try{history.replaceState(null,'','#s'+(i+1))}catch(e){}
+  }
+  prev.addEventListener('click',function(){show(i-1)});
+  next.addEventListener('click',function(){show(i+1)});
+  document.addEventListener('keydown',function(e){
+    if(e.target.closest&&e.target.closest('input,textarea,select'))return;
+    if(['ArrowRight','PageDown',' '].indexOf(e.key)>-1){e.preventDefault();show(i+1)}
+    else if(['ArrowLeft','PageUp'].indexOf(e.key)>-1){e.preventDefault();show(i-1)}
+    else if(e.key==='Home'){show(0)}
+    else if(e.key==='End'){show(slides.length-1)}
+  });
+  var m=/^#s(\d+)$/.exec(location.hash||'');
+  show(m?parseInt(m[1],10)-1:0);
+})();
+</script>
+
+</body>
+</html>
