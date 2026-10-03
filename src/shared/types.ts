@@ -6,7 +6,9 @@ export type ErpEventType =
   | "field_change"
   | "keystroke"
   | "save"
-  | "guardrail_blocked";
+  | "guardrail_blocked"
+  /** Seen on screen by vision (any app, not just the ERP). `note` says what changed. */
+  | "screen";
 
 export interface ErpEvent {
   /** The ERP sends Date.now(); the panel rewrites it to ms since recording start when it logs the event. */
@@ -16,8 +18,10 @@ export interface ErpEvent {
   field?: keyof Invoice | string;
   from?: string;
   to?: string;
-  /** Free text, e.g. the guardrail text on "guardrail_blocked". */
+  /** Free text, e.g. the guardrail text on "guardrail_blocked", or what vision saw on "screen". */
   note?: string;
+  /** App seen on screen (vision events), e.g. "Excel". */
+  app?: string;
 }
 
 // Matches data/invoices.json (Pablo's seed data).
@@ -57,6 +61,8 @@ export interface Moment {
   t: string;
   /** Seconds into the recording, for replay. */
   clip_s: number;
+  /** Session whose recording this moment is in (maps built from several sessions). Default: the map id. */
+  session?: string;
 }
 
 export interface Step {
@@ -106,6 +112,10 @@ export interface OpenQuestion {
   route_reason?: string;
   status: "open" | "answered";
   answer?: string;
+  /** Who asked (learner names). Only shown to the askers themselves, never to experts. */
+  askers?: string[];
+  asked_at?: string;
+  answered_at?: string;
 }
 
 export interface WorkMap {
@@ -120,6 +130,8 @@ export interface WorkMap {
   updated_at: string;
   /** true for the seeded example map. */
   sample?: boolean;
+  /** Session ids the map was built from. */
+  sources?: string[];
 }
 
 // Matches data/experts.json. `name` is the unique key.
@@ -133,14 +145,23 @@ export interface Expert {
 export interface TranscriptLine {
   /** ms since the recording started. */
   t: number;
-  speaker: "expert" | "agent" | "newhire";
+  /** "other" = someone else heard on a call (record and learn with call audio). */
+  speaker: "expert" | "agent" | "newhire" | "other";
+  /** Raw speaker label from transcription, e.g. "speaker_1". */
+  speaker_label?: string;
   text: string;
 }
 
 export interface SessionLog {
   id: string;
-  mode: "capture" | "teach" | "quick_ask";
+  /** "live" = Claudia asks while you work; "record" = record and learn, no questions. */
+  mode: "capture" | "teach" | "quick_ask" | "live" | "record";
   started_at: string;
+  ended_at?: string;
+  /** Short title for the session list, e.g. "Supplier invoices (3)". */
+  title?: string;
+  /** Set once a debrief turned this session into a Work Map. */
+  reviewed_in?: string;
   expert?: string;
   events: ErpEvent[];
   transcript: TranscriptLine[];

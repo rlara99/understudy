@@ -27,6 +27,16 @@ dataRoutes.put("/workmaps/:id", async (req, res) => {
   res.json(map);
 });
 
+// Session list for "Debrief and teach": newest first, without the heavy event/transcript arrays.
+dataRoutes.get("/sessions", async (_req, res) => {
+  const logs = await listJson<SessionLog>("sessions");
+  res.json(
+    logs
+      .map(({ events, transcript, ...rest }) => ({ ...rest, event_count: events.length, transcript_count: transcript.length }))
+      .sort((a, b) => b.started_at.localeCompare(a.started_at)),
+  );
+});
+
 dataRoutes.get("/sessions/:id", async (req, res) => {
   res.json(await readJson<SessionLog>(`sessions/${safeId(req.params.id)}.json`));
 });

@@ -7,6 +7,8 @@ import { relayRoutes } from "./routes/relay";
 
 const app = express();
 app.use(express.json({ limit: "15mb" }));
+// Record and learn uploads raw audio to /api/transcribe.
+app.use("/api/transcribe", express.raw({ type: () => true, limit: "200mb" }));
 // Separate local apps (e.g. the ERP on another port) may call the API directly.
 app.use((req, res, next) => {
   const origin = req.headers.origin;
