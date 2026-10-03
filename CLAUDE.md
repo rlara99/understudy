@@ -1,71 +1,95 @@
 # Understudy
 
-Hackathon build (Hack-Nation Challenge 01, "The AI Apprentice", ElevenLabs). Four hours, two people.
-An AI apprentice that captures an expert's judgment while they work (Capture), turns it into a Work Map (Map), coaches new hires (Teach), and sends questions it can't answer back to the right expert (Gap Loop, our differentiator).
+Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLabs). Team: Renzo (voice agents, prompts, server, pitch) and Pablo (ERP, recording, screens, data). Repo: github.com/rlara99/understudy (private). Public overview: `README.md`. Original concept and build plan: `docs/concept-deck.html`, `docs/build-split.html`.
 
-Plan and task split: `docs/build-split.html`. Concept: `docs/concept-deck.html`.
+An AI apprentice that captures an expert's judgment while they work (Capture), turns it into a Work Map (Map), coaches new hires on unseen cases (Teach), and sends questions it can't answer back to the right expert (the **Gap Loop**, our differentiator).
+
+## Status (end of build day)
+
+All three required modules and the Gap Loop work end to end and were tested live:
+
+| Piece | State |
+|---|---|
+| Capture | Works. Claudia asks at task completion (save or switching invoice), judges ask vs. acknowledge, reacts briefly to answers. |
+| Map + debrief | Works. Finish task → draft map + gaps (~15–30 s) → spoken debrief (3–5 questions, teach-back, capped at 3:30) → Confirm. |
+| Teach | Works. Blocked save of INV-5102 as opex → clip plays → predict-then-explain. Mastery panel in the ERP. |
+| Gap Loop | Works. USD invoice flagged → routed to Marta → voice Quick Ask in Expert Minute → Work Map patched → badge clears. Duplicates merge ("asked by N"). |
+| Trust | Personal fields blurred; Off the record (ERP button, panel button, or spoken) pauses recording, events, mic and transcript. |
+| README | Done. |
+
+**Still to do:** clean full run after **Reset demo** (also the first end-to-end test of the 3:30 debrief), backup demo video (Pablo), pitch slides with the 5 Apprentice Test answers and a moonshot slide. Optional stretch: "Export for agents" (Work Map → agent instructions).
 
 ## Run
 
 ```
 npm install
-cp .env.example .env   # fill in values (shared privately)
-npm run dev            # web on http://localhost:5173, API on :8787
+cp .env.example .env   # ANTHROPIC_API_KEY = Parley key, ANTHROPIC_BASE_URL=https://parley.api.mit.edu
+npm run dev            # web http://localhost:5173, API :8787 (8787 has no page: "Cannot GET /" is normal)
 npm run typecheck
 ```
 
-Open two tabs: `/#/erp` (fake ERP) and `/#/panel` (voice panel). ERP events reach the panel over BroadcastChannel `"erp"`.
+Restart `npm run dev` after changing any `.env*` file. Only one copy can run (ports 5173/8787).
+
+## Demo flow
+
+| Role | Tabs | Steps |
+|---|---|---|
+| Expert (Sabrina) | `/#/erp` + `/#/panel` | Start capture (share the ERP tab) → INV-4471 cost center 4711→0400, INV-4472 approval → second, INV-4473 status → held, saving each → Finish task → Start debrief → Confirm Work Map |
+| New hire (Lena) | `/#/erp/teach` + `/#/tutor` | Start tutor → INV-5102 saved as opex gets blocked → fix to 0400 + asset no. → INV-5103 (USD): "Sabrina never showed me this" → flagged |
+| Other expert (Marta) | `/#/inbox` | Start voice session → Start Quick Ask → answer → "that's saved" |
+| Anyone | `/#/library` | Coverage, mastery, open-question badges. **Reset demo** restores seed data. |
 
 ## Who owns what
 
-Only edit files you own. Change shared files together, then push right away.
+Only edit files you own; change shared files together and push right away.
 
 | Path | Owner |
 |---|---|
-| `server/**` (API, Claude calls, JSON store) | Renzo |
-| `src/agents/**` (prompts, pause rule) | Renzo |
-| `src/panel/**` (interviewer + tutor panels) | Renzo |
-| `src/erp/**` (fake ERP, Save hook) | Pablo |
-| `src/capture/**` (screen share, recording, frames) | Pablo |
-| `src/screens/**` (Work Map, Library, Expert Minute) | Pablo |
-| `data/invoices.json`, `data/experts.json` | Pablo |
-| `src/shared/**`, `src/App.tsx`, `src/styles.css`, `CLAUDE.md` | Shared |
+| `server/**`, `src/agents/**`, `src/panel/**` | Renzo |
+| `src/erp/**`, `src/capture/**`, `src/screens/**`, `data/invoices.json`, `data/experts.json` | Pablo |
+| `src/shared/**`, `src/App.tsx`, `src/styles.css`, `CLAUDE.md`, `README.md` | Shared |
 
-Git: `git pull` before starting, commit small, push at each checkpoint (0:20, 1:30, 2:30, 3:15). Work on `main`.
+Git: `git pull` before starting, commit small, work on `main`. Generated session Work Maps (`data/workmaps/session-*.json`) and session logs are gitignored. Local test runs also modify `data/workmaps/sample-invoice-processing.json`: don't commit that; **Reset demo** restores it.
 
-## Shared formats (`src/shared/types.ts`)
+## Architecture
 
-- `ErpEvent`: `{ t, type, invoice, field?, from?, to?, note? }`. ERP sends `t = Date.now()`; the panel rewrites it to ms since recording start.
-- `WorkMap`: steps (moment, decision, reason in the expert's words, said_at), guardrails (text, quote, machine `check`), open_questions, confirmed.
-- `GuardrailCheck`: if every `when` condition holds and `require` does not, the save is blocked. Evaluate with `violatedGuardrails()` in `src/shared/guardrails.ts`.
-- `Invoice`: matches `data/invoices.json` (phase, country, supplier_known, answer_key, ...). `answer_key` is what the expert would do, for the mastery panel.
-- `Expert`: `{ name, title, team, topics }`; `name` is the key. Used to route gap questions.
-- `data/workmaps/sample-invoice-processing.json` is a hand-made example so screens can be built before `/api/map` works.
+- **ERP → panels:** the ERP publishes `ErpEvent`s over BroadcastChannel `"erp"` (`src/shared/bus.ts`). `field_change` fires on blur/select, `keystroke` is throttled, `save` and `guardrail_blocked` on Save. No events while off the record.
+- **Apprentice panel** (`src/panel/ApprenticePanel.tsx`): phases capture → mapping → ready → debrief → confirming → done, plus quickask → patching → qadone (opened from the inbox via `src/screens/quickAsk.ts`). The screen recording start is the session's zero point (event `t` = ms since recording start, matching the video).
+- **Tutor panel** (`src/panel/TutorPanel.tsx`): loads the newest confirmed real map (sample as fallback), sends it as `[WORKMAP]`, shows the expert's clip on a blocked save, flags gaps.
+- **Work Map:** steps (moment, decision, reason in the expert's words), guardrails with machine `check` rules (`violatedGuardrails()` in `src/shared/guardrails.ts`), open_questions, confirmed.
+- **Recording:** `MediaRecorder` → IndexedDB (`src/capture/recordings.ts`). `ClipPlayer` plays 3 s before to 10 s after a moment, 30 s max. Off-the-record spans are cut from the recording.
+- **Storage:** JSON files in `data/` via `server/store.ts`.
 
-## API (`server/`)
+### API (`server/`)
 
-- `GET /api/invoices`, `GET /api/experts`, `GET /api/workmaps`, `GET|PUT /api/workmaps/:id`, `GET|PUT /api/sessions/:id`
-- `POST /api/frame` `{ image, previous? }` → `{ changes[] }` (optional; cut first if behind)
-- `POST /api/map` `{ sessionId, workflow, expert, team }` → `{ map, gaps }`
-- `POST /api/route` `{ question, context? }` → `{ expert_name, reason, neutral_question }`
-- `POST /api/patch` `{ workmapId, questionId, answer, expert }` → updated map
+- `GET /api/invoices`, `/api/experts`, `/api/workmaps`; `GET|PUT /api/workmaps/:id`, `/api/sessions/:id`
+- `POST /api/map` `{ sessionId, workflow, expert, team, confirm?, debriefStartedAt? }` → `{ map, gaps }`. First call drafts; `confirm: true` folds debrief answers in and marks confirmed. Ignores off-record spans.
+- `POST /api/route` `{ question, context?, open? }` → `{ expert_name, reason, neutral_question, duplicate_of }`. Short, general question; duplicate detection.
+- `POST /api/patch` `{ workmapId, questionId, answer, expert }` → map with a new step and guardrails; stores a cleaned `answer_clean` built from the confirmed repeat-back.
+- `POST /api/frame` (vision frames, optional, unused in the demo).
 
-Claude calls go through MIT Parley (`ANTHROPIC_BASE_URL=https://parley.api.mit.edu`, Parley key in `ANTHROPIC_API_KEY`); `server/env.ts` makes `.env` win over shell variables. Claude calls live in `server/claude.ts`. Models: `claude-opus-5-5` for map/route/patch, `claude-haiku-4-5` for frames (speed). Override with `MAP_MODEL` / `FRAME_MODEL`.
+Claude goes through **MIT Parley** (Anthropic-compatible; the key does NOT start with `sk-ant-`). `server/env.ts` loads `.env` with override so a shell-level `ANTHROPIC_BASE_URL` can't win. Models: `claude-opus-5-5` (map, route, patch), `claude-haiku-4-5` (frames); override via `MAP_MODEL` / `FRAME_MODEL`. Structured outputs via `client.messages.parse` + zod (`server/claude.ts`).
 
 ## ElevenLabs
 
-- Two agents in the dashboard: Interviewer and Tutor. Prompts and first messages live in `src/agents/prompts.ts` and are sent at session start as overrides (enable System prompt + First message overrides in each agent's Security tab). Agent name: `AGENT_NAME` (say "Hey Claudia").
-- Pause timing: `src/agents/pauseRule.ts` (idle 1.5 s) and the 700 ms field-change merge in the panel.
-- Agents must be public (no auth) so the browser can start a session with just the agent ID.
+- Two agents (Creator plan): Interviewer `agent_4001m41j8r97eqks9k6y6nk8x05p`, Tutor `agent_1201m41qmexxet890wg5vmqqzsgb`. IDs are committed in `.env.development` (public by nature).
+- Both are named **Claudia** (`AGENT_NAME`); the expert persona is **Sabrina**. Prompts and first messages live in `src/agents/prompts.ts` and are sent as **session overrides**: edit the code, not the dashboard. Each agent needs System prompt + First message overrides enabled in its Security tab. Interviewer has the Skip turn system tool on.
 - Dynamic variables: `agent_name`, `expert_name`, plus `mode` (live | debrief | quick_ask) for the Interviewer.
-- Enable the `skip_turn` system tool on the Interviewer.
-- Tutor client tools (define in the dashboard with the same names): `replay_moment { clip_s }`, `flag_open_question { question, context }`, `get_guardrails {}`.
-- Message prefixes the agents understand: `[SCREEN]` (context update, never spoken to), `[PAUSE]`, `[GAPS]`, `[QUESTION]`, `[WORKMAP]`, `[BLOCKED]`.
-- Minutes are metered on the Creator plan: test with short calls, rehearse with voice.
+- App → agent message prefixes. `[SCREEN]`, `[WORKMAP]`, `[OFF RECORD]`, `[ON RECORD]` are silent context updates. `[TASK DONE]`, `[PAUSE]`, `[GAPS]`, `[WRAP UP]`, `[TIME UP]`, `[QUESTION]`, `[ADDRESSED]`, `[OPENED]`, `[BLOCKED]`, `[SAVED]` are user messages that trigger a reply.
+- Timing (`src/agents/pauseRule.ts`): main trigger = task done; mid-task only important fields (cost_center, approval, status) after a 2.5 s pause; 8 s minimum gap; resend once if unanswered after 5 s.
+- Mic: picker in both panels; mic muted while the agent speaks (half-duplex, against background noise) unless "Let me interrupt" is ticked; muted while off the record.
+
+## Lessons / gotchas
+
+- **Never call `sendUserActivity`** on keystrokes: it holds the agent ~2 s and silently swallowed our nudges.
+- If the agent "goes silent" on nudges, check the Debug list in the panel first, then the agent's Call history and LLM setting in the dashboard.
+- Gaps and guardrail checks: the map prompt must tell Claude to approximate checks with available fields (e.g. amount > 5000 EUR for "equipment"), otherwise the capex rule has no check and Teach can't catch the demo mistake.
+- Voice answers are messy transcripts; the patch uses the agent's confirmed repeat-back to store a clean answer.
+- Pablo's files use CRLF line endings; normalize before string-matching edits.
+- Starting a terminal-panel tab from Claude can time out; starting `npm run dev` in the background from Bash works.
 
 ## Rules
 
 - Keys only in `.env`. Never commit `.env` or paste keys in chat.
-- Personal fields (IBAN, contact) render with class `pii` (blurred) and must never be sent to Claude.
-- The Interviewer never says who asked a question in Quick Ask.
-- If behind, cut in this order: vision frames, real question merging, live mastery scoring, voice Quick Ask.
+- Personal fields (IBAN, contact) render with class `pii` (blurred) and are never sent to Claude.
+- Gap questions never reveal who asked.
