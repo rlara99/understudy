@@ -439,12 +439,13 @@ function Panel() {
   const saveQuickAsk = async () => {
     const qa = quickAskRef.current;
     if (!qa || phaseRef.current !== "quickask") return;
-    const answer = logRef.current.transcript
-      .slice(quickAskFrom.current)
-      .filter((l) => l.speaker === "expert")
-      .map((l) => l.text)
-      .join(" ")
-      .trim();
+    const exchange = logRef.current.transcript.slice(quickAskFrom.current);
+    if (!exchange.some((l) => l.speaker === "expert")) {
+      setError("No spoken answer captured yet. Answer the question, then press Save answer.");
+      return;
+    }
+    // The whole exchange, so the server can use the repeat-back the expert confirmed.
+    const answer = exchange.map((l) => `${l.speaker === "agent" ? AGENT_NAME : "Expert"}: ${l.text}`).join("\n");
     if (!answer) {
       setError("No spoken answer captured yet. Answer the question, then press Save answer.");
       return;

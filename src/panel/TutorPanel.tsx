@@ -90,13 +90,19 @@ function Tutor() {
     const question = hint ?? (inv ? `How should an invoice like ${describeInvoice(inv)} be handled?` : "A case the Work Map doesn't cover.");
     note(`flagging gap: ${question.slice(0, 80)}`);
     try {
-      const routed = await postJson<{ expert_name: string; reason: string; neutral_question: string }>("/api/route", {
-        question,
-        context,
-      });
       const latest = await getJson<WorkMap>(`/api/workmaps/${m.id}`);
-      const same = latest.open_questions.find((q) => q.status === "open" && q.context === context);
-      if (same) same.asked_by_count += 1;
+      const open = latest.open_questions.filter((q) => q.status === "open");
+      const routed = await postJson<{
+        expert_name: string;
+        reason: string;
+        neutral_question: string;
+        duplicate_of: string | null;
+      }>("/api/route", { question, context, open: open.map((q) => ({ id: q.id, q: q.q })) });
+      const same = open.find((q) => q.id === routed.duplicate_of);
+      if (same) {
+        same.asked_by_count += 1;
+        note(`merged into an existing question, now asked by ${same.asked_by_count}`);
+      }
       else {
         const q: OpenQuestion = {
           id: `q-${Date.now()}`,

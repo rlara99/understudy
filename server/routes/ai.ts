@@ -79,7 +79,7 @@ The transcript continues after the task with a spoken debrief (lines with t >= $
     schema: z.object({ steps: z.array(Step), guardrails: z.array(Guardrail), gaps: z.array(z.string()) }),
     system: `You turn a recorded work session into a Work Map that a new hire can learn from.
 Use the expert's own words for every reason and guardrail quote. Times are mm:ss from the recording start (event t is in ms); a step's moment.clip_s is the seconds into the recording where it happened.
-Guardrail text: one plain rule a new hire can follow, under 15 words, no commentary.
+Guardrail text: one plain rule a new hire can follow, under 15 words. Never mention checks, fields, data or the system in it.
 Give every guardrail a machine check whenever you can: if every "when" condition holds and "require" does not, the save is blocked. Invoice fields: ${INVOICE_FIELDS}. If the rule depends on something not in these fields (for example "equipment"), approximate it with the fields you have (for example amount gt 5000 and currency eq EUR) instead of leaving the check out.
 List as "gaps" the questions a new hire would still need answered: missing reasons, unclear limits, exceptions you saw but were not explained. Each gap is ONE short spoken question, under 20 words. Max 5, most important first.${debriefNote}`,
     user: JSON.stringify({ events: log.events, transcript: log.transcript, off_record: log.off_record ?? [] }),
@@ -99,15 +99,27 @@ List as "gaps" the questions a new hire would still need answered: missing reaso
   res.json({ map, gaps: result.gaps });
 });
 
-// ---------- POST /api/route  { question, context? } ----------
+// ---------- POST /api/route  { question, context?, open?: {id, q}[] } ----------
+// Returns the expert to ask, a short general question, and duplicate_of when an open question already covers it.
 aiRoutes.post("/route", async (req, res) => {
-  const { question, context } = req.body as { question: string; context?: string };
+  const { question, context, open } = req.body as {
+    question: string;
+    context?: string;
+    open?: { id: string; q: string }[];
+  };
   const experts = await readJson<Expert[]>("experts.json");
   const result = await askJson({
-    schema: z.object({ expert_name: z.string(), reason: z.string(), neutral_question: z.string() }),
-    system:
-      "Pick the one expert (by exact name) best placed to answer a new hire's question, based on title, team and topics. Rewrite the question neutrally: no names, nothing that reveals who asked. Give the reason in one sentence.",
-    user: JSON.stringify({ question, context, experts }),
+    schema: z.object({
+      expert_name: z.string(),
+      reason: z.string(),
+      neutral_question: z.string(),
+      duplicate_of: z.string().nullable(),
+    }),
+    system: `A new hire hit a case their training doesn't cover.
+1. Pick the one expert (by exact name) best placed to answer, based on title, team and topics. Give the reason in one sentence.
+2. Write neutral_question: a short, general question an expert can answer in a minute, under 20 words. Ask about the kind of case, not this one invoice: no invoice numbers, dates or amounts. No names, nothing that reveals who asked. Example: "How do we book invoices in a foreign currency, and is there a limit?"
+3. duplicate_of: if one of the open questions already asks essentially the same thing, its id; otherwise null.`,
+    user: JSON.stringify({ question, context, open: open ?? [], experts }),
   });
   res.json(result);
 });
@@ -127,14 +139,16 @@ aiRoutes.post("/patch", async (req, res) => {
     return;
   }
   const result = await askJson({
-    schema: z.object({ step: Step, guardrails: z.array(Guardrail) }),
-    system: `An expert answered an open question about a workflow. Turn the answer into one new Work Map step and any guardrails it implies, using the expert's own words. Use moment {t:"00:00", clip_s:0} and said_at "quick ask". New ids must not clash with existing ones. Invoice fields for checks: ${INVOICE_FIELDS}.`,
+    schema: z.object({ answer_clean: z.string(), step: Step, guardrails: z.array(Guardrail) }),
+    system: `An expert answered an open question about a workflow by voice. The answer may be a speech-to-text transcript with mistakes and filler, and may include the agent's repeat-back that the expert confirmed; trust the confirmed repeat-back where the transcript is garbled.
+answer_clean: the expert's answer in one or two clear sentences, in their voice ("Convert at ...").
+Then turn it into one new Work Map step and any guardrails it implies, using the expert's words. Use moment {t:"00:00", clip_s:0} and said_at "quick ask". New ids must not clash with existing ones. Guardrail text: one plain rule under 15 words, written for a new hire. Never mention checks, fields, data or the system in it. Add a machine check when possible. Invoice fields for checks: ${INVOICE_FIELDS}.`,
     user: JSON.stringify({ question: question.q, context: question.context, answer, expert, existing: map }),
   });
   map.steps.push(result.step);
   map.guardrails.push(...(result.guardrails as WorkMap["guardrails"]));
   question.status = "answered";
-  question.answer = answer;
+  question.answer = result.answer_clean;
   map.updated_at = new Date().toISOString();
   await writeJson(`workmaps/${map.id}.json`, map);
   res.json(map);
