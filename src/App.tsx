@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ErpPage } from "./erp/ErpPage";
 import { ApprenticePanel } from "./panel/ApprenticePanel";
 import { TutorPanel } from "./panel/TutorPanel";
+import { WorkSession } from "./panel/WorkSession";
 import { InboxScreen } from "./screens/InboxScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { WorkMapScreen } from "./screens/WorkMapScreen";
@@ -29,6 +30,14 @@ const LINKS: [string, string][] = [
 export function App() {
   const route = useHash();
   const [page, arg] = route.split("/");
+
+  // Live session routes (Renzo): no navigation, they run in the small companion window on desktop.
+  if (route === "work/live" || route === "work/record")
+    return (
+      <main className="session-main">
+        <WorkSession key={route} mode={arg === "record" ? "record" : "live"} />
+      </main>
+    );
 
   let body;
   if (page === "erp") body = <ErpPage mode={arg === "teach" ? "teach" : "capture"} />;

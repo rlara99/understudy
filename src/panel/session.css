@@ -1,0 +1,26 @@
+/* Owner: Renzo. Compact layout for live sessions (companion window ~420 px wide). Uses the shared tokens. */
+.ws { display: flex; flex-direction: column; gap: 14px; max-width: 560px; }
+.ws-head { display: flex; align-items: center; gap: 10px; }
+.ws-head > div { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ws-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rule, #d4d4d8); flex: none; }
+.ws-dot.rec { background: #dc2626; box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15); animation: ws-pulse 1.6s ease-in-out infinite; }
+.ws-dot.off { background: #a1a1aa; }
+@keyframes ws-pulse { 50% { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0.05); } }
+@media (prefers-reduced-motion: reduce) { .ws-dot.rec { animation: none; } }
+.ws-clock { font-variant-numeric: tabular-nums; font-family: ui-monospace, Consolas, monospace; color: var(--muted, #71717a); }
+.ws-setup, .ws-run, .ws-saved { display: flex; flex-direction: column; gap: 10px; }
+.ws-setup select { flex: 1; min-width: 0; }
+.ws-check { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--rule, #e4e4e7); border-radius: 8px; cursor: pointer; }
+.ws-check > span { display: flex; flex-direction: column; gap: 2px; }
+.ws-check input { margin-top: 3px; }
+.ws-primary { background: var(--accent, #4f46e5) !important; color: #fff !important; border-color: transparent !important; font-weight: 600; padding: 10px 14px; }
+.ws-status { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.9em; color: var(--muted, #71717a); }
+.ws-question { margin: 0; padding: 12px 14px; border-left: 3px solid var(--accent, #4f46e5); background: var(--sheet, #fff); border-radius: 0 8px 8px 0; font-size: 1.05em; }
+.ws-off { margin: 0; padding: 10px 12px; border-radius: 8px; background: #fef2f2; color: #991b1b; font-size: 0.92em; }
+.ws-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ws-actions button { flex: 1; min-width: 140px; }
+.ws-feed .log { max-height: 260px; overflow: auto; }
+.small { font-size: 0.86em; }
+.eyebrow { font-size: 0.75em; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted, #71717a); margin: 0 0 6px; }
+@media (prefers-color-scheme: dark) { .ws-off { background: #3f1d1d; color: #fecaca; } }
+.session-main { padding: 16px; }
