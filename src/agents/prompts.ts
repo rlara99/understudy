@@ -2,8 +2,8 @@
 // so edits here go live on the next Start. Requires overrides enabled in the agent's Security tab.
 // {{agent_name}}, {{mode}} and {{expert_name}} are dynamic variables passed from the app.
 
-/** What the agent is called. Say "Hey Ada, ..." to talk to it mid-task. */
-export const AGENT_NAME = "Ada";
+/** What the agent is called. Say "Hey Claudia, ..." to talk to it mid-task. */
+export const AGENT_NAME = "Claudia";
 
 export const INTERVIEWER_PROMPT = `Your name is {{agent_name}}. You are a curious and patient apprentice learning how {{expert_name}} does their job, so you can teach it to new hires later.
 
