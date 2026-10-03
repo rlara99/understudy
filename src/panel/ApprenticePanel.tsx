@@ -158,7 +158,7 @@ function Panel() {
       const e = { ...raw, t: raw.t - startRef.current };
       if (e.type === "keystroke") {
         pause.current.activity();
-        if (connected) conv.current.sendUserActivity();
+        // No sendUserActivity here: it holds the agent for ~2 s and swallowed our nudges.
         return;
       }
       if (e.type === "field_change") {
@@ -189,8 +189,16 @@ function Panel() {
       const decision = pause.current.check(conv.current.isSpeaking);
       if (!decision) return;
       pause.current.markAsked(decision);
-      conv.current.sendUserMessage(`[PAUSE] Ask one question about: ${decision}`);
+      const nudge = `[PAUSE] Ask one question about: ${decision}`;
+      const sentAt = Date.now();
+      conv.current.sendUserMessage(nudge);
       note(`pause nudge sent: ${decision}`);
+      // Safety net: if the agent stays silent, resend once.
+      setTimeout(() => {
+        if (lastAgentSpeech.current >= sentAt || conv.current.status !== "connected") return;
+        conv.current.sendUserMessage(nudge);
+        note("no answer to the nudge after 5 s: resent once");
+      }, 5000);
     }, 500);
     return () => clearInterval(id);
   }, [connected, phase]);

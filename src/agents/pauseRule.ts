@@ -31,7 +31,7 @@ export class PauseDetector {
   constructor(
     private opts: PauseRuleOptions = {
       idleMs: 1500,
-      urgentIdleMs: 600,
+      urgentIdleMs: 800,
       decisionWindowMs: 45000,
       maxQuestions: 5,
       minGapMs: 8000,
