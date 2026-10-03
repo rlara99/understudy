@@ -12,7 +12,7 @@ export function ErpPage({ mode }: { mode: "capture" | "teach" }) {
   const [current, setCurrent] = useState<Invoice | null>(null);
 
   useEffect(() => {
-    getJson<Invoice[]>("/api/invoices").then((all) => setInvoices(all.filter((i) => i.used_in === mode)));
+    getJson<Invoice[]>("/api/invoices").then((all) => setInvoices(all.filter((i) => i.phase === mode)));
   }, [mode]);
 
   const open = (inv: Invoice) => {
@@ -71,7 +71,7 @@ export function ErpPage({ mode }: { mode: "capture" | "teach" }) {
             <dl className="facts">
               <dt>Supplier</dt>
               <dd>
-                {current.supplier} ({current.supplier_country})
+                {current.supplier} ({current.country})
               </dd>
               <dt>Description</dt>
               <dd>{current.description}</dd>
@@ -84,7 +84,7 @@ export function ErpPage({ mode }: { mode: "capture" | "teach" }) {
               <dt>IBAN</dt>
               <dd className="pii">{current.iban ?? "n/a"}</dd>
               <dt>Contact</dt>
-              <dd className="pii">{current.contact ?? "n/a"}</dd>
+              <dd className="pii">{current.contact_name ?? "n/a"}</dd>
             </dl>
             {EDITABLE.map((field) => (
               <label key={field}>

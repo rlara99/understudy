@@ -1,23 +1,44 @@
 [
   {
-    "id": "sabrina",
     "name": "Sabrina M.",
-    "title": "Senior Accounts Payable Specialist",
+    "title": "Senior Accounts Payable Specialist, 24 years",
     "team": "Accounts payable",
-    "topics": ["supplier invoices", "cost centers", "capex vs opex", "month-end close", "supplier holds"]
+    "topics": [
+      "supplier invoice processing",
+      "cost center coding",
+      "capex vs opex",
+      "asset numbers",
+      "intercompany invoices",
+      "Czech subsidiary approvals",
+      "supplier holds",
+      "month-end close"
+    ]
   },
   {
-    "id": "thomas",
-    "name": "Thomas K.",
+    "name": "Marta N.",
     "title": "Accounts Payable Team Lead",
     "team": "Accounts payable",
-    "topics": ["foreign currency invoices", "approvals", "intercompany invoices", "payment runs"]
+    "topics": [
+      "foreign currency invoices",
+      "USD and FX conversion",
+      "exchange rates",
+      "treasury sign-off",
+      "payment runs",
+      "approval limits",
+      "international suppliers"
+    ]
   },
   {
-    "id": "jonas",
     "name": "Jonas K.",
-    "title": "Vendor Master Data Lead",
+    "title": "Vendor Master Data Specialist",
     "team": "Vendor master data",
-    "topics": ["new suppliers", "bank detail changes", "supplier verification"]
+    "topics": [
+      "new supplier onboarding",
+      "unknown suppliers",
+      "supplier bank detail changes",
+      "IBAN verification",
+      "duplicate supplier records",
+      "tax IDs"
+    ]
   }
 ]

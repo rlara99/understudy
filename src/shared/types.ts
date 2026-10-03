@@ -20,24 +20,35 @@ export interface ErpEvent {
   note?: string;
 }
 
+// Matches data/invoices.json (Pablo's seed data).
 export interface Invoice {
   id: string;
+  phase: "capture" | "teach";
   supplier: string;
-  supplier_country: string;
-  category: "equipment" | "services" | "logistics" | "tools";
+  supplier_known: boolean;
+  /** ISO country code, e.g. "CZ". */
+  country: string;
+  /** ISO date, e.g. "2025-12-12". */
+  date: string;
   description: string;
   amount: number;
   currency: "EUR" | "USD";
-  /** ISO date, e.g. "2025-12-12". */
-  date: string;
   cost_center: string;
-  asset_no?: string;
-  approval: "none" | "second";
-  status: "open" | "held" | "posted";
-  /** Personal data: blur before capture. */
+  asset_no: string;
+  approval: "single" | "second";
+  status: "open" | "held" | "posted" | "pending_approval";
+  /** Personal data: blur on screen, never send to Claude. */
   iban?: string;
-  contact?: string;
-  used_in: "capture" | "teach";
+  contact_name?: string;
+  /** What the expert would do. For the mastery panel; never shown to the new hire up front. */
+  answer_key?: {
+    cost_center?: string;
+    asset_no_required?: boolean;
+    approval?: string;
+    status?: string;
+    gap?: boolean;
+    why: string;
+  };
 }
 
 /** A point in the screen recording. */
@@ -90,6 +101,7 @@ export interface OpenQuestion {
   context?: string;
   moment?: Moment;
   asked_by_count: number;
+  /** Expert name. */
   route_to?: string;
   route_reason?: string;
   status: "open" | "answered";
@@ -110,8 +122,8 @@ export interface WorkMap {
   sample?: boolean;
 }
 
+// Matches data/experts.json. `name` is the unique key.
 export interface Expert {
-  id: string;
   name: string;
   title: string;
   team: string;

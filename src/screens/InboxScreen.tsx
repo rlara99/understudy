@@ -14,7 +14,7 @@ export function InboxScreen() {
   const questions = maps.flatMap((m) =>
     m.open_questions.filter((q) => q.status === "open").map((q) => ({ ...q, map: m })),
   );
-  const name = (id?: string) => experts.find((e) => e.id === id)?.name ?? "Unassigned";
+  const name = (n?: string) => experts.find((e) => e.name === n)?.name ?? "Unassigned";
 
   return (
     <div className="screen">

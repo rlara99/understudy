@@ -38,7 +38,8 @@ Git: `git pull` before starting, commit small, push at each checkpoint (0:20, 1:
 - `ErpEvent`: `{ t, type, invoice, field?, from?, to?, note? }`. ERP sends `t = Date.now()`; the panel rewrites it to ms since recording start.
 - `WorkMap`: steps (moment, decision, reason in the expert's words, said_at), guardrails (text, quote, machine `check`), open_questions, confirmed.
 - `GuardrailCheck`: if every `when` condition holds and `require` does not, the save is blocked. Evaluate with `violatedGuardrails()` in `src/shared/guardrails.ts`.
-- `Expert`: `{ id, name, title, team, topics }`, used to route gap questions.
+- `Invoice`: matches `data/invoices.json` (phase, country, supplier_known, answer_key, ...). `answer_key` is what the expert would do, for the mastery panel.
+- `Expert`: `{ name, title, team, topics }`; `name` is the key. Used to route gap questions.
 - `data/workmaps/sample-invoice-processing.json` is a hand-made example so screens can be built before `/api/map` works.
 
 ## API (`server/`)
@@ -46,7 +47,7 @@ Git: `git pull` before starting, commit small, push at each checkpoint (0:20, 1:
 - `GET /api/invoices`, `GET /api/experts`, `GET /api/workmaps`, `GET|PUT /api/workmaps/:id`, `GET|PUT /api/sessions/:id`
 - `POST /api/frame` `{ image, previous? }` → `{ changes[] }` (optional; cut first if behind)
 - `POST /api/map` `{ sessionId, workflow, expert, team }` → `{ map, gaps }`
-- `POST /api/route` `{ question, context? }` → `{ expert_id, reason, neutral_question }`
+- `POST /api/route` `{ question, context? }` → `{ expert_name, reason, neutral_question }`
 - `POST /api/patch` `{ workmapId, questionId, answer, expert }` → updated map
 
 Claude calls live in `server/claude.ts`. Models: `claude-opus-5-5` for map/route/patch, `claude-haiku-4-5` for frames (speed). Override with `MAP_MODEL` / `FRAME_MODEL`.

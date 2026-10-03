@@ -58,7 +58,11 @@
     {
       "id": "g2",
       "text": "Unknown supplier: stop and ask the controller.",
-      "said_at": "00:31"
+      "said_at": "00:31",
+      "check": {
+        "when": [{ "field": "supplier_known", "op": "eq", "value": "false" }],
+        "require": { "field": "status", "op": "eq", "value": "held" }
+      }
     },
     {
       "id": "g3",
@@ -67,7 +71,7 @@
       "said_at": "03:15",
       "check": {
         "when": [
-          { "field": "category", "op": "eq", "value": "equipment" },
+          { "field": "currency", "op": "eq", "value": "EUR" },
           { "field": "amount", "op": "gt", "value": 5000 }
         ],
         "require": { "field": "cost_center", "op": "eq", "value": "0400" }
@@ -78,7 +82,7 @@
       "text": "Czech subsidiary invoices need a second approval.",
       "said_at": "04:44",
       "check": {
-        "when": [{ "field": "supplier_country", "op": "eq", "value": "CZ" }],
+        "when": [{ "field": "country", "op": "eq", "value": "CZ" }],
         "require": { "field": "approval", "op": "eq", "value": "second" }
       }
     },
@@ -101,8 +105,8 @@
       "q": "How should an invoice in a foreign currency (for example USD) be booked, and is there a limit that needs extra sign-off?",
       "context": "INV-5103, Ridgeline Tools Inc., 3,400 USD",
       "asked_by_count": 3,
-      "route_to": "thomas",
-      "route_reason": "Thomas leads AP and lists foreign currency invoices as a topic.",
+      "route_to": "Marta N.",
+      "route_reason": "Marta leads AP and lists foreign currency invoices as a topic.",
       "status": "open"
     }
   ]

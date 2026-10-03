@@ -31,7 +31,7 @@ const Step = z.object({
   guardrails: z.array(z.string()),
 });
 const INVOICE_FIELDS =
-  "id, supplier, supplier_country, category (equipment|services|logistics|tools), description, amount, currency, date (YYYY-MM-DD), cost_center, asset_no, approval (none|second), status (open|held|posted)";
+  "id, supplier, supplier_known (true|false), country (ISO code), date (YYYY-MM-DD), description, amount, currency (EUR|USD), cost_center, asset_no, approval (single|second), status (open|held|posted|pending_approval)";
 
 // ---------- POST /api/frame  { image: base64 jpeg, previous?: string } ----------
 // Optional path (cut first if behind). The ERP's own events are the main signal.
@@ -93,9 +93,9 @@ aiRoutes.post("/route", async (req, res) => {
   const { question, context } = req.body as { question: string; context?: string };
   const experts = await readJson<Expert[]>("experts.json");
   const result = await askJson({
-    schema: z.object({ expert_id: z.string(), reason: z.string(), neutral_question: z.string() }),
+    schema: z.object({ expert_name: z.string(), reason: z.string(), neutral_question: z.string() }),
     system:
-      "Pick the one expert best placed to answer a new hire's question, based on title, team and topics. Rewrite the question neutrally: no names, nothing that reveals who asked. Give the reason in one sentence.",
+      "Pick the one expert (by exact name) best placed to answer a new hire's question, based on title, team and topics. Rewrite the question neutrally: no names, nothing that reveals who asked. Give the reason in one sentence.",
     user: JSON.stringify({ question, context, experts }),
   });
   res.json(result);
