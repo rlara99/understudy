@@ -13,6 +13,7 @@ import { formatMs, onErpEvent } from "../shared/bus";
 import { closeSession } from "../shared/desktop";
 import type { ErpEvent, SessionLog, TranscriptLine } from "../shared/types";
 import { useAudioTranscriber } from "./useAudioTranscriber";
+import { useMicHold } from "./useMicHold";
 import "./session.css";
 
 type Mode = "live" | "record";
@@ -69,6 +70,9 @@ function Session({ mode }: { mode: Mode }) {
 
   const screen = useScreenRecorder();
   const audio = useAudioTranscriber();
+  const mic = useMicHold();
+  /** Last nudge, so it can be resent once if noise cuts the answer off. */
+  const lastNudge = useRef<{ text: string; at: number; resent: boolean } | null>(null);
   const zero = useRef(Date.now());
   const logRef = useRef(log);
   logRef.current = log;
@@ -86,10 +90,24 @@ function Session({ mode }: { mode: Mode }) {
 
   // ---------- Claudia (live mode only) ----------
   const conversation = useConversation({
-    micMuted: screen.offRecord || agentSpeaking, // off the record: she hears nothing; while she talks: no noise cut-offs
+    micMuted: screen.offRecord || mic.held, // off the record: she hears nothing; mic closed while she prepares/says a reply
     onModeChange: ({ mode: m }) => {
       if (m === "speaking") lastAgentSpeech.current = Date.now();
       setAgentSpeaking(m === "speaking");
+      mic.onMode(m);
+    },
+    onInterruption: () => {
+      note("interrupted by sound");
+      const n = lastNudge.current;
+      if (n && !n.resent && Date.now() - n.at < 20_000) {
+        n.resent = true;
+        setTimeout(() => {
+          if (conv.current.status !== "connected" || offRef.current) return;
+          mic.hold(8000);
+          conv.current.sendUserMessage(n.text);
+          note("question resent after interruption");
+        }, 800);
+      }
     },
     onDisconnect: (d) => note(`disconnected: ${JSON.stringify(d).slice(0, 100)}`),
     onError: (m) => note(`error: ${String(m)}`),
@@ -103,6 +121,7 @@ function Session({ mode }: { mode: Mode }) {
           return;
         }
         pause.current.activity();
+        mic.hold(3000); // she may reply: keep noise out until she has
         if (NAME_RE.test(message)) {
           const heardAt = Date.now();
           setTimeout(() => {
@@ -123,11 +142,14 @@ function Session({ mode }: { mode: Mode }) {
 
   const sendNudge = (nudge: string, resend: boolean) => {
     const sentAt = Date.now();
+    mic.hold(8000);
+    lastNudge.current = { text: nudge, at: sentAt, resent: false };
     conv.current.sendUserMessage(nudge);
     note(nudge.slice(0, 90));
     if (!resend) return;
     setTimeout(() => {
       if (lastAgentSpeech.current >= sentAt || conv.current.status !== "connected") return;
+      mic.hold(8000);
       conv.current.sendUserMessage(nudge);
     }, 5000);
   };

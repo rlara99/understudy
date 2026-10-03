@@ -11,6 +11,7 @@ import { getJson, postJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
 import type { Invoice, OpenQuestion, Step, WorkMap } from "../shared/types";
 import { useScreenWatch, type FrameResult } from "./useScreenWatch";
+import { useMicHold } from "./useMicHold";
 import "./session.css";
 
 const EXPERT_FIRST_NAME = "Sabrina";
@@ -117,9 +118,11 @@ function Tutor() {
     }
   };
 
+  const mic = useMicHold();
   const conversation = useConversation({
-    micMuted: agentSpeaking, // background noise can't cut the tutor off
+    micMuted: mic.held, // mic closed while the tutor prepares/says a reply, so noise can't cut it off
     onModeChange: ({ mode }) => {
+      mic.onMode(mode);
       setAgentSpeaking(mode === "speaking");
       note(`tutor ${mode}`);
     },
@@ -133,7 +136,10 @@ function Tutor() {
     onError: (message) => note(`error: ${String(message)}`),
     onMessage: ({ message, role }) => {
       setTranscript((t) => [...t, { t: Date.now() - t0.current, who: role === "agent" ? "tutor" : "new hire", text: message }]);
-      if (role !== "agent") lastLearnerText.current = message;
+      if (role !== "agent") {
+        lastLearnerText.current = message;
+        mic.hold(3000);
+      }
       // Backups that don't depend on client tools being set up in the dashboard:
       if (role !== "agent" && GAP_RE.test(message)) flagGap(currentInvoice.current);
       if (role === "agent" && /\bflagged\b/i.test(message)) flagGap(currentInvoice.current);
@@ -142,6 +148,11 @@ function Tutor() {
   const connected = conversation.status === "connected";
   const conv = useRef(conversation);
   conv.current = conversation;
+  /** Send the tutor a message it should answer, with the mic closed until it has. */
+  const say = (text: string) => {
+    mic.hold(8000);
+    conv.current.sendUserMessage(text);
+  };
 
   // ERP (teach tab) events -> tutor
   useEffect(() => {
@@ -154,7 +165,7 @@ function Tutor() {
         currentInvoice.current = e.invoice;
         setClipStep(null);
         const inv = invoicesRef.current.find((i) => i.id === e.invoice);
-        if (live && inv) conv.current.sendUserMessage(`[OPENED] ${describeInvoice(inv)}`);
+        if (live && inv) say(`[OPENED] ${describeInvoice(inv)}`);
         return;
       }
       if (e.type === "field_change") {
@@ -162,7 +173,7 @@ function Tutor() {
         return;
       }
       if (e.type === "save") {
-        if (live) conv.current.sendUserMessage(`[SAVED] ${e.invoice} saved with status ${e.to}.`);
+        if (live) say(`[SAVED] ${e.invoice} saved with status ${e.to}.`);
         return;
       }
       if (e.type === "guardrail_blocked") {
@@ -182,7 +193,7 @@ function Tutor() {
           blockedBatch = [];
           note(`blocked: ${lines.join(" | ").slice(0, 120)}`);
           if (conv.current.status === "connected")
-            conv.current.sendUserMessage(
+            say(
               `[BLOCKED] The new hire tried to save ${e.invoice}, but it breaks ${lines.join("; ")}. ${EXPERT_FIRST_NAME}'s clip is already playing on screen.`,
             );
         }, 250);
@@ -217,7 +228,7 @@ function Tutor() {
     conv.current.sendContextualUpdate(`[SCREEN] ${r.app}: ${[...r.changes, r.task_done ?? ""].filter(Boolean).join("; ")}`);
     if (r.judgment_call && Date.now() - lastTipAt.current > 20_000) {
       lastTipAt.current = Date.now();
-      conv.current.sendUserMessage(`[DECIDING] In ${r.app}, the learner seems to be deciding: ${r.judgment_call}.`);
+      say(`[DECIDING] In ${r.app}, the learner seems to be deciding: ${r.judgment_call}.`);
       note(`tip nudge: ${r.judgment_call}`);
     }
   });
@@ -229,7 +240,7 @@ function Tutor() {
     setTyped("");
     lastLearnerText.current = text;
     setTranscript((t) => [...t, { t: Date.now() - t0.current, who: "new hire", text }]);
-    conv.current.sendUserMessage(text);
+    say(text);
     if (GAP_RE.test(text)) flagGap(currentInvoice.current, text);
   };
 

@@ -8,6 +8,7 @@ import { getJson, postJson } from "../shared/api";
 import { formatMs } from "../shared/bus";
 import type { SessionLog, TranscriptLine, WorkMap } from "../shared/types";
 import "./session.css";
+import { useMicHold } from "./useMicHold";
 
 type SessionSummary = Omit<SessionLog, "events" | "transcript"> & { event_count: number; transcript_count: number };
 type Phase = "pick" | "mapping" | "ready" | "debrief" | "confirming" | "done";
@@ -62,14 +63,16 @@ function Debrief() {
     stage.current = 2;
     conv.current.sendContextualUpdate(`[WORKMAP] ${mapForAgent(mapRef.current)}`);
     const list = gapsRef.current.map((g, i) => `${i + 1}. ${g}`).join("\n");
-    conv.current.sendUserMessage(
+    say(
       `[GAPS]\n${list || "No open gaps. Go straight to the teach-back."}\nYou have 5 minutes. Ask about these one at a time, then explain the whole process back.`,
     );
   };
 
+  const mic = useMicHold();
   const conversation = useConversation({
-    micMuted: agentSpeaking,
+    micMuted: mic.held, // closed while Claudia prepares/says a reply, so noise can't cut the play-back off
     onModeChange: ({ mode }) => {
+      mic.onMode(mode);
       setAgentSpeaking(mode === "speaking");
       if (mode === "speaking" && stage.current === 0) stage.current = 1;
       else if (mode === "listening" && stage.current === 1) sendGaps();
@@ -78,13 +81,20 @@ function Debrief() {
       setTimeout(() => {
         if (!conv.current.isSpeaking) sendGaps();
       }, 8000),
-    onMessage: ({ message, role }) =>
-      setLines((l) => [...l, { t: Date.now() - t0.current, speaker: role === "agent" ? "agent" : "expert", text: message }]),
+    onMessage: ({ message, role }) => {
+      if (role !== "agent") mic.hold(4000);
+      setLines((l) => [...l, { t: Date.now() - t0.current, speaker: role === "agent" ? "agent" : "expert", text: message }]);
+    },
     onError: (m) => setError(String(m)),
   });
   const connected = conversation.status === "connected";
   const conv = useRef(conversation);
   conv.current = conversation;
+  /** Send Claudia a message she should answer, with the mic closed until she has. */
+  const say = (text: string) => {
+    mic.hold(8000);
+    conv.current.sendUserMessage(text);
+  };
 
   // 5-minute clock with wrap-up nudges.
   useEffect(() => {
@@ -96,11 +106,11 @@ function Debrief() {
       setSecs(s);
       if (s >= WRAP_AT_S && !wrap) {
         wrap = true;
-        conv.current.sendUserMessage("[WRAP UP] About a minute left. Skip any remaining questions. Do the teach-back now, under 30 seconds.");
+        say("[WRAP UP] About a minute left. Skip any remaining questions. Do the teach-back now, under 30 seconds.");
       }
       if (s >= END_AT_S && !end) {
         end = true;
-        conv.current.sendUserMessage("[TIME UP] Finish in one sentence and ask the expert to press Confirm.");
+        say("[TIME UP] Finish in one sentence and ask the expert to press Confirm.");
       }
     }, 1000);
     return () => clearInterval(id);
