@@ -1,0 +1,23 @@
+[
+  {
+    "id": "sabrina",
+    "name": "Sabrina M.",
+    "title": "Senior Accounts Payable Specialist",
+    "team": "Accounts payable",
+    "topics": ["supplier invoices", "cost centers", "capex vs opex", "month-end close", "supplier holds"]
+  },
+  {
+    "id": "thomas",
+    "name": "Thomas K.",
+    "title": "Accounts Payable Team Lead",
+    "team": "Accounts payable",
+    "topics": ["foreign currency invoices", "approvals", "intercompany invoices", "payment runs"]
+  },
+  {
+    "id": "jonas",
+    "name": "Jonas K.",
+    "title": "Vendor Master Data Lead",
+    "team": "Vendor master data",
+    "topics": ["new suppliers", "bank detail changes", "supplier verification"]
+  }
+]

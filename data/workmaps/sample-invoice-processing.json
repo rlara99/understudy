@@ -1,0 +1,109 @@
+{
+  "id": "sample-invoice-processing",
+  "sample": true,
+  "workflow": "Supplier invoice processing",
+  "expert": "Sabrina M.",
+  "team": "Accounts payable",
+  "confirmed": true,
+  "updated_at": "2026-10-03T12:00:00Z",
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Open the invoice and check the supplier",
+      "moment": { "t": "00:20", "clip_s": 20 },
+      "decision": "Checked the supplier against the vendor list",
+      "reason": "If I don't know the supplier, nothing else matters until the controller says it's real.",
+      "said_at": "00:31",
+      "guardrails": ["g2"]
+    },
+    {
+      "id": "s4",
+      "title": "Code the invoice to a cost center",
+      "moment": { "t": "03:12", "clip_s": 192 },
+      "decision": "Re-coded INV-4471 from 4711 (opex) to 0400 (capex)",
+      "reason": "Equipment over 5,000 euros is always capex.",
+      "said_at": "03:15",
+      "guardrails": ["g1", "g3"]
+    },
+    {
+      "id": "s5",
+      "title": "Route subsidiary invoices for a second approval",
+      "moment": { "t": "04:40", "clip_s": 280 },
+      "decision": "Set INV-4472 approval to second",
+      "reason": "Anything from the Czech subsidiary goes to a second approver, no matter the amount.",
+      "said_at": "04:44",
+      "guardrails": ["g4"]
+    },
+    {
+      "id": "s6",
+      "title": "Hold known December double-billers",
+      "moment": { "t": "05:55", "clip_s": 355 },
+      "decision": "Set INV-4473 status to held",
+      "reason": "Brandt bills December twice almost every year. I hold it until their statement arrives.",
+      "said_at": "06:02",
+      "guardrails": ["g5"]
+    }
+  ],
+  "guardrails": [
+    {
+      "id": "g1",
+      "text": "No asset number, no capex booking.",
+      "quote": "If there's no asset number I can't book it to capex.",
+      "said_at": "03:20",
+      "check": {
+        "when": [{ "field": "cost_center", "op": "eq", "value": "0400" }],
+        "require": { "field": "asset_no", "op": "present" }
+      }
+    },
+    {
+      "id": "g2",
+      "text": "Unknown supplier: stop and ask the controller.",
+      "said_at": "00:31"
+    },
+    {
+      "id": "g3",
+      "text": "Equipment over 5,000 EUR must be booked to capex (0400).",
+      "quote": "Equipment over 5,000 euros is always capex.",
+      "said_at": "03:15",
+      "check": {
+        "when": [
+          { "field": "category", "op": "eq", "value": "equipment" },
+          { "field": "amount", "op": "gt", "value": 5000 }
+        ],
+        "require": { "field": "cost_center", "op": "eq", "value": "0400" }
+      }
+    },
+    {
+      "id": "g4",
+      "text": "Czech subsidiary invoices need a second approval.",
+      "said_at": "04:44",
+      "check": {
+        "when": [{ "field": "supplier_country", "op": "eq", "value": "CZ" }],
+        "require": { "field": "approval", "op": "eq", "value": "second" }
+      }
+    },
+    {
+      "id": "g5",
+      "text": "Brandt invoices dated in December are held until the statement arrives.",
+      "said_at": "06:02",
+      "check": {
+        "when": [
+          { "field": "supplier", "op": "eq", "value": "Brandt Logistik GmbH" },
+          { "field": "date", "op": "contains", "value": "-12-" }
+        ],
+        "require": { "field": "status", "op": "eq", "value": "held" }
+      }
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "q1",
+      "q": "How should an invoice in a foreign currency (for example USD) be booked, and is there a limit that needs extra sign-off?",
+      "context": "INV-5103, Ridgeline Tools Inc., 3,400 USD",
+      "asked_by_count": 3,
+      "route_to": "thomas",
+      "route_reason": "Thomas leads AP and lists foreign currency invoices as a topic.",
+      "status": "open"
+    }
+  ]
+}
