@@ -44,6 +44,23 @@ Electron app in this repo (`desktop/`), wrapping the same React app and server. 
 
 **Pablo, next:** pull; build the ERP as its own app (own entry/page, not in Understudy's nav), sending events with `publishErpEvent`; swap `control.ts` to the relay; build the shell, Knowledge Repository and both Expert Minute screens, starting sessions with `openSession(...)`.
 
+### Renzo's modules (done, pushed): how the shell plugs them in
+
+| Module | Route | Component | Opens in | Start it with |
+|---|---|---|---|---|
+| Work mode: live | `work/live` | `WorkSession mode="live"` | companion (bare route, no nav) | `openSession(SESSION_ROUTES.workLive)` |
+| Work mode: record and learn | `work/record` | `WorkSession mode="record"` | companion (bare route) | `openSession(SESSION_ROUTES.workRecord)` |
+| Debrief and teach | `expert/debrief` | `DebriefModule` | main window, inside the shell | link to `#/expert/debrief` |
+| Assistant | `learner/assistant` | `TutorPanel` (titled Assistant) | companion (bare route) | `openSession(SESSION_ROUTES.assistant)` |
+
+Keep the bare routes (`work/live`, `work/record`, `learner/assistant`) rendering without the shell; they run in the 420 px companion window. Work mode's "Go to Debrief & teach" calls `closeSession("expert/debrief")`.
+
+APIs for the shell:
+- `GET /api/sessions` (newest first; `mode` live/record/capture, `title`, `reviewed_in`, counts).
+- Learner Expert Minute: `GET /api/questions?asker=Lena` (status, answer, route_to, map_id) and `POST /api/questions { question, context?, asker: "Lena" }` (routes, merges duplicates; returns `{ question, merged, map_id }`). `LEARNER = "Lena"` is exported from `src/panel/TutorPanel.tsx`.
+- Expert Minute (expert side): open questions are in each map's `open_questions`; voice answers still go through `#/panel` via `setPendingQuickAsk(...)` (ApprenticePanel quick ask).
+- Knowledge Repository clips: a step's recording is `step.moment.session ?? map.id` (maps built from several sessions set `moment.session`). Pass that as `ClipPlayer sessionId`.
+
 ## Run
 
 ```
