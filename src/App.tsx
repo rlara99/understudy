@@ -4,6 +4,7 @@ import { ErpPage } from "./erp/ErpPage";
 import { ApprenticePanel } from "./panel/ApprenticePanel";
 import { TutorPanel } from "./panel/TutorPanel";
 import { WorkSession } from "./panel/WorkSession";
+import { DebriefModule } from "./panel/DebriefModule";
 import { InboxScreen } from "./screens/InboxScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { WorkMapScreen } from "./screens/WorkMapScreen";
@@ -46,6 +47,7 @@ export function App() {
   else if (page === "library") body = <LibraryScreen />;
   else if (page === "inbox") body = <InboxScreen />;
   else if (page === "map" && arg) body = <WorkMapScreen id={arg} />;
+  else if (route === "expert/debrief") body = <DebriefModule />;
   else body = <p className="muted">Open the ERP and the Apprentice panel in two separate tabs.</p>;
 
   return (
