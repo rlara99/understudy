@@ -56,29 +56,40 @@ aiRoutes.post("/frame", async (req, res) => {
   res.json({ changes: text.split("\n").map((s) => s.trim()).filter((s) => s && s !== "no change") });
 });
 
-// ---------- POST /api/map  { sessionId, workflow, expert, team } ----------
+// ---------- POST /api/map  { sessionId, workflow, expert, team, confirm?, debriefStartedAt? } ----------
+// First call (after the task): draft map + gaps for the debrief.
+// Second call with confirm: true (after the teach-back): folds in the debrief answers, marks confirmed.
 aiRoutes.post("/map", async (req, res) => {
-  const { sessionId, workflow, expert, team } = req.body as {
+  const { sessionId, workflow, expert, team, confirm, debriefStartedAt } = req.body as {
     sessionId: string;
     workflow: string;
     expert: string;
     team: string;
+    confirm?: boolean;
+    /** ms on the session clock when the debrief began; transcript lines after it are debrief answers. */
+    debriefStartedAt?: number;
   };
-  const log = await readJson<SessionLog>(`sessions/${safeId(sessionId)}.json`);
+  const id = safeId(sessionId);
+  const log = await readJson<SessionLog>(`sessions/${id}.json`);
+  const debriefNote = confirm
+    ? `
+The transcript continues after the task with a spoken debrief (lines with t >= ${debriefStartedAt ?? 0} ms): the expert answered follow-up questions and confirmed or corrected a teach-back. Use those answers to fill in reasons and guardrails, and apply every correction. Return "gaps" only for things still unanswered.`
+    : "";
   const result = await askJson({
     schema: z.object({ steps: z.array(Step), guardrails: z.array(Guardrail), gaps: z.array(z.string()) }),
     system: `You turn a recorded work session into a Work Map that a new hire can learn from.
-Use the expert's own words for every reason and guardrail quote. Times are mm:ss from the recording start (event t is in ms).
-For each guardrail that can be checked on an invoice, add a machine check: if every "when" condition holds and "require" does not, the save is blocked. Invoice fields: ${INVOICE_FIELDS}.
-List as "gaps" the questions a new hire would still need answered: missing reasons, unclear limits, exceptions you saw but were not explained. Max 5, most important first.`,
+Use the expert's own words for every reason and guardrail quote. Times are mm:ss from the recording start (event t is in ms); a step's moment.clip_s is the seconds into the recording where it happened.
+Guardrail text: one plain rule a new hire can follow, under 15 words, no commentary.
+Give every guardrail a machine check whenever you can: if every "when" condition holds and "require" does not, the save is blocked. Invoice fields: ${INVOICE_FIELDS}. If the rule depends on something not in these fields (for example "equipment"), approximate it with the fields you have (for example amount gt 5000 and currency eq EUR) instead of leaving the check out.
+List as "gaps" the questions a new hire would still need answered: missing reasons, unclear limits, exceptions you saw but were not explained. Each gap is ONE short spoken question, under 20 words. Max 5, most important first.${debriefNote}`,
     user: JSON.stringify({ events: log.events, transcript: log.transcript, off_record: log.off_record ?? [] }),
   });
   const map: WorkMap = {
-    id: safeId(sessionId),
+    id,
     workflow,
     expert,
     team,
-    confirmed: false,
+    confirmed: Boolean(confirm),
     steps: result.steps,
     guardrails: result.guardrails as WorkMap["guardrails"],
     open_questions: [],

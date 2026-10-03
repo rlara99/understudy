@@ -47,3 +47,4 @@ main { padding: 16px; }
 .guardrail { background: var(--hl); width: fit-content; padding: 0 4px; list-style: none; }
 
 @media (max-width: 700px) { .erp { grid-template-columns: 1fr; } }
+.error { color: #b42318; }

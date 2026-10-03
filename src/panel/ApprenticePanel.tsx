@@ -1,14 +1,19 @@
 // Owner: Renzo. Voice side panel for the expert (Interviewer agent).
+// Flow: Start capture (share screen + live questions) -> Finish task (draft Work Map + gaps)
+//       -> Start debrief (gaps, then teach-back) -> Confirm Work Map.
 // Open the ERP in another tab; its events arrive here over BroadcastChannel.
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
 import { IMPORTANT_FIELDS, PauseDetector } from "../agents/pauseRule";
-import { AGENT_NAME, INTERVIEWER_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
+import { AGENT_NAME, DEBRIEF_FIRST_MESSAGE, INTERVIEWER_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
+import { useScreenRecorder } from "../capture/useScreenRecorder";
+import { postJson, putJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
-import { putJson } from "../shared/api";
-import type { ErpEvent, SessionLog, TranscriptLine } from "../shared/types";
+import type { ErpEvent, SessionLog, TranscriptLine, WorkMap } from "../shared/types";
 
-type Mode = "live" | "debrief" | "quick_ask";
+type Phase = "capture" | "mapping" | "ready" | "debrief" | "confirming" | "done";
+
+const WORKFLOW = { workflow: "Supplier invoice processing", expert: "Sabrina M.", team: "Accounts payable" };
 
 /** The agent's name plus common speech-to-text misspellings of it. */
 const NAME_RE = new RegExp(`\\b(${AGENT_NAME}|cloudia|klaudia|claudio|clodia)\\b`, "i");
@@ -28,23 +33,60 @@ function describe(e: ErpEvent): string {
   }
 }
 
+/** The parts of the Work Map the agent needs for the teach-back. */
+function mapForAgent(map: WorkMap): string {
+  return JSON.stringify({
+    steps: map.steps.map((s) => ({ title: s.title, decision: s.decision, reason: s.reason, guardrails: s.guardrails })),
+    guardrails: map.guardrails.map((g) => ({ id: g.id, text: g.text })),
+  });
+}
+
 function Panel() {
-  const [mode, setMode] = useState<Mode>("live");
+  const [phase, setPhase] = useState<Phase>("capture");
   const [log, setLog] = useState<SessionLog>(() => ({
     id: `session-${Date.now()}`,
     mode: "capture",
     started_at: new Date().toISOString(),
-    expert: "Sabrina M.",
+    expert: WORKFLOW.expert,
     events: [],
     transcript: [],
   }));
+  const [map, setMap] = useState<WorkMap | null>(null);
+  const [gaps, setGaps] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<string[]>([]);
+
+  const screen = useScreenRecorder();
   const startRef = useRef(Date.now());
   const pause = useRef(new PauseDetector());
-  const [debug, setDebug] = useState<string[]>([]);
+  const lastAgentSpeech = useRef(0);
+  const debriefStartedAt = useRef<number | null>(null);
+  /** 0 = waiting for greeting, 1 = greeting playing, 2 = gaps sent. */
+  const debriefStage = useRef(0);
+  // Refs so callbacks always see the latest values.
+  const logRef = useRef(log);
+  logRef.current = log;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const gapsRef = useRef(gaps);
+  gapsRef.current = gaps;
+  const mapRef = useRef(map);
+  mapRef.current = map;
+
   const note = (text: string) =>
     setDebug((d) => [...d.slice(-40), `${formatMs(Date.now() - startRef.current)} ${text}`]);
 
-  const lastAgentSpeech = useRef(0);
+  /** Send the draft map and the gaps; the agent starts asking. */
+  const sendGaps = () => {
+    if (debriefStage.current === 2 || !mapRef.current) return;
+    debriefStage.current = 2;
+    conv.current.sendContextualUpdate(`[WORKMAP] ${mapForAgent(mapRef.current)}`);
+    const list = gapsRef.current.map((g, i) => `${i + 1}. ${g}`).join("\n");
+    conv.current.sendUserMessage(
+      `[GAPS]\n${list || "No open gaps. Go straight to the teach-back."}\nAsk about these one at a time, then explain the whole process back.`,
+    );
+    note("debrief: gaps sent");
+  };
 
   const conversation = useConversation({
     onAgentToolRequest: (props) => note(`agent tool call: ${JSON.stringify(props).slice(0, 160)}`),
@@ -52,6 +94,18 @@ function Panel() {
     onModeChange: ({ mode }) => {
       if (mode === "speaking") lastAgentSpeech.current = Date.now();
       note(`agent ${mode}`);
+      // In the debrief, send the gaps once the greeting has finished.
+      if (phaseRef.current === "debrief") {
+        if (mode === "speaking" && debriefStage.current === 0) debriefStage.current = 1;
+        else if (mode === "listening" && debriefStage.current === 1) sendGaps();
+      }
+    },
+    onConnect: () => {
+      if (phaseRef.current !== "debrief") return;
+      // Fallback in case the greeting events don't arrive.
+      setTimeout(() => {
+        if (phaseRef.current === "debrief" && !conv.current.isSpeaking) sendGaps();
+      }, 8000);
     },
     onDisconnect: (details) => note(`disconnected: ${JSON.stringify(details).slice(0, 160)}`),
     onMessage: ({ message, role }) => {
@@ -93,12 +147,12 @@ function Panel() {
   useEffect(() => {
     const record = (e: ErpEvent) => {
       setLog((l) => ({ ...l, events: [...l.events, e] }));
-      if (!connected) return;
+      if (!connected || phaseRef.current !== "capture") return;
       conv.current.sendContextualUpdate(`[SCREEN] ${formatMs(e.t)} ${describe(e)}`);
       if (e.type === "field_change") pause.current.decision(describe(e), IMPORTANT_FIELDS.has(String(e.field)));
     };
-    // The ERP fires field_change on every keystroke. Merge them per field and
-    // record one change ("4711" -> "0400") once typing in that field stops.
+    // Merge rapid field_change events per field into one change. (The ERP now sends one per
+    // field on blur, so this rarely triggers; kept as a safety net.)
     const pending = new Map<string, { event: ErpEvent; timer: ReturnType<typeof setTimeout> }>();
     const unsubscribe = onErpEvent((raw) => {
       const e = { ...raw, t: raw.t - startRef.current };
@@ -128,9 +182,9 @@ function Panel() {
     };
   }, [connected]);
 
-  // Pause check: nudge one question when the expert pauses after a decision
+  // Pause check: nudge one question when the expert pauses after a decision (capture only)
   useEffect(() => {
-    if (!connected || mode !== "live") return;
+    if (!connected || phase !== "capture") return;
     const id = setInterval(() => {
       const decision = pause.current.check(conv.current.isSpeaking);
       if (!decision) return;
@@ -139,49 +193,136 @@ function Panel() {
       note(`pause nudge sent: ${decision}`);
     }, 500);
     return () => clearInterval(id);
-  }, [connected, mode]);
+  }, [connected, phase]);
 
-  const start = () => {
-    startRef.current = Date.now();
+  const startAgent = (mode: "live" | "debrief") =>
     conversation.startSession({
       agentId: import.meta.env.VITE_INTERVIEWER_AGENT_ID,
       connectionType: "webrtc",
       dynamicVariables: { mode, expert_name: "Sabrina", agent_name: AGENT_NAME },
-      // Prompts come from src/agents/prompts.ts (needs overrides enabled in the agent's Security tab).
-      overrides: { agent: { prompt: { prompt: INTERVIEWER_PROMPT }, firstMessage: INTERVIEWER_FIRST_MESSAGE } },
+      // Prompts come from src/agents/prompts.ts (overrides are enabled in the agent's Security tab).
+      overrides: {
+        agent: {
+          prompt: { prompt: INTERVIEWER_PROMPT },
+          firstMessage: mode === "debrief" ? DEBRIEF_FIRST_MESSAGE : INTERVIEWER_FIRST_MESSAGE,
+        },
+      },
     });
+
+  /** Share the screen (first time only), then start the live interviewer. */
+  const startCapture = async () => {
+    setError(null);
+    const fresh = logRef.current.events.length === 0 && logRef.current.transcript.length === 0;
+    if (fresh && !screen.recording) {
+      // The recording's start time is the session zero point, so event times match the video.
+      const t0 = await screen.start(logRef.current.id);
+      if (t0 === null) {
+        note("screen share cancelled: continuing without a recording");
+        startRef.current = Date.now();
+      } else {
+        startRef.current = t0;
+      }
+    }
+    startAgent("live");
   };
 
-  const save = () => putJson(`/api/sessions/${log.id}`, log);
+  const saveSession = () => putJson(`/api/sessions/${logRef.current.id}`, logRef.current);
+
+  /** End the live session, store the recording, and build the draft Work Map. */
+  const finishTask = async () => {
+    setError(null);
+    setPhase("mapping");
+    if (connected) conversation.endSession();
+    await screen.stop();
+    try {
+      await saveSession();
+      const r = await postJson<{ map: WorkMap; gaps: string[] }>("/api/map", {
+        sessionId: logRef.current.id,
+        ...WORKFLOW,
+      });
+      setMap(r.map);
+      setGaps(r.gaps);
+      setPhase("ready");
+    } catch (e) {
+      setError(`Could not build the Work Map: ${String(e)}`);
+      setPhase("capture");
+    }
+  };
+
+  const startDebrief = () => {
+    debriefStage.current = 0;
+    debriefStartedAt.current = Date.now() - startRef.current;
+    note("debrief started");
+    setPhase("debrief");
+    phaseRef.current = "debrief";
+    startAgent("debrief");
+  };
+
+  /** Fold the debrief answers into the map and mark it confirmed. */
+  const confirmMap = async () => {
+    setError(null);
+    setPhase("confirming");
+    if (connected) conversation.endSession();
+    try {
+      await saveSession();
+      const r = await postJson<{ map: WorkMap; gaps: string[] }>("/api/map", {
+        sessionId: logRef.current.id,
+        ...WORKFLOW,
+        confirm: true,
+        debriefStartedAt: debriefStartedAt.current ?? 0,
+      });
+      setMap(r.map);
+      setGaps(r.gaps);
+      setPhase("done");
+    } catch (e) {
+      setError(`Could not confirm the Work Map: ${String(e)}`);
+      setPhase("debrief");
+    }
+  };
+
+  const busy = phase === "mapping" || phase === "confirming";
 
   return (
     <div className="panel">
       <h2>Apprentice</h2>
       <div className="row">
-        <select id="mode" value={mode} onChange={(e) => setMode(e.target.value as Mode)} disabled={connected}>
-          <option value="live">Live capture</option>
-          <option value="debrief">Debrief</option>
-          <option value="quick_ask">Quick Ask</option>
-        </select>
-        {connected ? (
-          <button onClick={() => conversation.endSession()}>Stop</button>
-        ) : (
-          <button onClick={start}>Start</button>
+        {phase === "capture" &&
+          (connected ? (
+            <button onClick={() => conversation.endSession()}>Pause</button>
+          ) : (
+            <button onClick={startCapture}>{log.events.length ? "Resume capture" : "Start capture"}</button>
+          ))}
+        {phase === "capture" && (
+          <button onClick={finishTask} disabled={log.events.length === 0}>
+            Finish task
+          </button>
         )}
-        <button onClick={save}>Save session</button>
+        {phase === "ready" && <button onClick={startDebrief}>Start debrief</button>}
+        {phase === "debrief" && <button onClick={confirmMap}>Confirm Work Map</button>}
+        {(phase === "done" || phase === "ready") && map && <a href={`#/map/${map.id}`}>Open Work Map</a>}
       </div>
       <p className="muted">
-        Status: {conversation.status} · {conversation.isSpeaking ? "agent speaking" : "listening"} · pause nudges
-        sent: {pause.current.asked}
+        {phase === "mapping" && "Building the Work Map draft… (up to a minute)"}
+        {phase === "confirming" && "Saving the confirmed Work Map… (up to a minute)"}
+        {phase === "done" && `Work Map confirmed: ${map?.steps.length ?? 0} steps, ${map?.guardrails.length ?? 0} guardrails.`}
+        {!busy && phase !== "done" && (
+          <>
+            Status: {conversation.status} · {conversation.isSpeaking ? "agent speaking" : "listening"} ·{" "}
+            {screen.recording ? "recording screen" : "not recording"} · questions nudged: {pause.current.asked}
+          </>
+        )}
       </p>
-      <h3>Debug</h3>
-      <ul className="log">
-        {debug.map((d, i) => (
-          <li key={i} className="muted">
-            {d}
-          </li>
-        ))}
-      </ul>
+      {(error || screen.error) && <p className="error">{error ?? screen.error}</p>}
+      {gaps.length > 0 && (
+        <>
+          <h3>{phase === "done" ? "Still open" : "Gaps for the debrief"}</h3>
+          <ol>
+            {gaps.map((g, i) => (
+              <li key={i}>{g}</li>
+            ))}
+          </ol>
+        </>
+      )}
       <h3>Transcript</h3>
       <ul className="log">
         {log.transcript.map((l, i) => (
@@ -198,6 +339,16 @@ function Panel() {
           </li>
         ))}
       </ul>
+      <details>
+        <summary className="muted">Debug</summary>
+        <ul className="log">
+          {debug.map((d, i) => (
+            <li key={i} className="muted">
+              {d}
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }
