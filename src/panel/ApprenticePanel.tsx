@@ -2,13 +2,16 @@
 // Open the ERP in another tab; its events arrive here over BroadcastChannel.
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
-import { PauseDetector } from "../agents/pauseRule";
+import { IMPORTANT_FIELDS, PauseDetector } from "../agents/pauseRule";
 import { AGENT_NAME, INTERVIEWER_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
 import { formatMs, onErpEvent } from "../shared/bus";
 import { putJson } from "../shared/api";
 import type { ErpEvent, SessionLog, TranscriptLine } from "../shared/types";
 
 type Mode = "live" | "debrief" | "quick_ask";
+
+/** The agent's name plus common speech-to-text misspellings of it. */
+const NAME_RE = new RegExp(`\\b(${AGENT_NAME}|cloudia|klaudia|claudio|clodia)\\b`, "i");
 
 function describe(e: ErpEvent): string {
   switch (e.type) {
@@ -41,10 +44,15 @@ function Panel() {
   const note = (text: string) =>
     setDebug((d) => [...d.slice(-40), `${formatMs(Date.now() - startRef.current)} ${text}`]);
 
+  const lastAgentSpeech = useRef(0);
+
   const conversation = useConversation({
     onAgentToolRequest: (props) => note(`agent tool call: ${JSON.stringify(props).slice(0, 160)}`),
     onInterruption: () => note("agent was interrupted (mic picked up sound)"),
-    onModeChange: ({ mode }) => note(`agent ${mode}`),
+    onModeChange: ({ mode }) => {
+      if (mode === "speaking") lastAgentSpeech.current = Date.now();
+      note(`agent ${mode}`);
+    },
     onDisconnect: (details) => note(`disconnected: ${JSON.stringify(details).slice(0, 160)}`),
     onMessage: ({ message, role }) => {
       const line: TranscriptLine = {
@@ -53,7 +61,20 @@ function Panel() {
         text: message,
       };
       setLog((l) => ({ ...l, transcript: [...l.transcript, line] }));
-      if (role !== "agent") pause.current.activity();
+      if (role === "agent") return;
+      pause.current.activity();
+      // The expert called the agent by name. If it hasn't started answering, tell it explicitly.
+      if (NAME_RE.test(message)) {
+        const heardAt = Date.now();
+        note(`name heard: "${message}"`);
+        setTimeout(() => {
+          if (lastAgentSpeech.current >= heardAt) return;
+          conv.current.sendUserMessage(
+            `[ADDRESSED] The expert said your name and is talking to you. They said: "${message}". Answer them now, briefly.`,
+          );
+          note("name nudge sent");
+        }, 1200);
+      }
     },
     onVadScore: ({ vadScore }) => {
       if (vadScore > 0.6) pause.current.activity();
@@ -74,7 +95,7 @@ function Panel() {
       setLog((l) => ({ ...l, events: [...l.events, e] }));
       if (!connected) return;
       conv.current.sendContextualUpdate(`[SCREEN] ${formatMs(e.t)} ${describe(e)}`);
-      if (e.type === "field_change") pause.current.decision(describe(e));
+      if (e.type === "field_change") pause.current.decision(describe(e), IMPORTANT_FIELDS.has(String(e.field)));
     };
     // The ERP fires field_change on every keystroke. Merge them per field and
     // record one change ("4711" -> "0400") once typing in that field stops.
@@ -113,7 +134,7 @@ function Panel() {
     const id = setInterval(() => {
       const decision = pause.current.check(conv.current.isSpeaking);
       if (!decision) return;
-      pause.current.markAsked();
+      pause.current.markAsked(decision);
       conv.current.sendUserMessage(`[PAUSE] Ask one question about: ${decision}`);
       note(`pause nudge sent: ${decision}`);
     }, 500);
