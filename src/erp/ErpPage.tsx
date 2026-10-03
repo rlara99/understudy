@@ -2,6 +2,7 @@
 // Every change is published as an ErpEvent so the voice panel can follow along.
 // Teach mode loads the newest Work Map and blocks any save that breaks one of its guardrails.
 import { useEffect, useRef, useState } from "react";
+import { onControl, postControl } from "../capture/control";
 import { getJson } from "../shared/api";
 import { publishErpEvent } from "../shared/bus";
 import { violatedGuardrails } from "../shared/guardrails";
@@ -77,7 +78,11 @@ const initials = (name: string) =>
     .slice(0, 2)
     .map((w) => w[0].toUpperCase())
     .join("");
-const publish = (e: Omit<ErpEvent, "t">) => publishErpEvent({ t: Date.now(), ...e });
+// While off the record the ERP sends nothing: no events reach the agent or the session log.
+let offRecordNow = false;
+const publish = (e: Omit<ErpEvent, "t">) => {
+  if (!offRecordNow) publishErpEvent({ t: Date.now(), ...e });
+};
 
 export function ErpPage({ mode }: { mode: Mode }) {
   const [invoices, setInvoices] = useState<Draft[]>([]);
@@ -85,7 +90,22 @@ export function ErpPage({ mode }: { mode: Mode }) {
   const [map, setMap] = useState<WorkMap | null>(null);
   const [blocked, setBlocked] = useState<Guardrail[]>([]);
   const [saved, setSaved] = useState(false);
+  const [capture, setCapture] = useState({ recording: false, offRecord: false });
   const focusValue = useRef<Partial<Record<TextField, string>>>({});
+
+  // Follow the recorder in the panel tab; ask for its state in case a session is already running.
+  useEffect(() => {
+    const unsubscribe = onControl((msg) => {
+      if (msg.kind !== "state") return;
+      offRecordNow = msg.offRecord;
+      setCapture({ recording: msg.recording, offRecord: msg.offRecord });
+    });
+    postControl({ kind: "ping" });
+    return () => {
+      unsubscribe();
+      offRecordNow = false;
+    };
+  }, []);
   const lastKeystroke = useRef<Partial<Record<TextField, number>>>({});
 
   useEffect(() => {
@@ -184,6 +204,23 @@ export function ErpPage({ mode }: { mode: Mode }) {
           {mode === "capture" ? "Expert session" : "Training"}
         </span>
       </header>
+
+      {capture.offRecord && (
+        <div className="erp-offrec" role="status">
+          <b>Off the record.</b> Nothing on screen or in this tab is being recorded or sent to the apprentice.
+        </div>
+      )}
+      {capture.recording && (
+        <button
+          type="button"
+          className={`erp-offrec-btn${capture.offRecord ? " on" : ""}`}
+          aria-pressed={capture.offRecord}
+          onClick={() => postControl({ kind: "request", offRecord: !capture.offRecord })}
+        >
+          <i aria-hidden="true" />
+          {capture.offRecord ? "Back on the record" : "Off the record"}
+        </button>
+      )}
 
       <div className="erp-body">
         <aside className="erp-list" aria-label="Open invoices">

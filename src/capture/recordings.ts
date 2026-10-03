@@ -4,9 +4,20 @@
 const DB_NAME = "understudy";
 const STORE = "recordings";
 
-interface StoredRecording {
-  id: string;
+/** A span taken off the record, in ms since the session started. */
+export interface Cut {
+  from: number;
+  to: number;
+}
+
+export interface Recording {
   blob: Blob;
+  /** Off-the-record spans. The video has no footage for them, so later moments sit earlier in the file. */
+  cuts: Cut[];
+}
+
+interface StoredRecording extends Recording {
+  id: string;
   saved_at: number;
 }
 
@@ -33,20 +44,35 @@ async function run<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => I
 }
 
 /** Store a recording under its session id (e.g. the SessionLog id). */
-export async function saveRecording(id: string, blob: Blob): Promise<void> {
-  await run("readwrite", (s) => s.put({ id, blob, saved_at: Date.now() } satisfies StoredRecording));
+export async function saveRecording(id: string, blob: Blob, cuts: Cut[] = []): Promise<void> {
+  await run("readwrite", (s) => s.put({ id, blob, cuts, saved_at: Date.now() } satisfies StoredRecording));
 }
 
 /** A recording by session id, or the newest one when no id is given. */
-export async function loadRecording(id?: string): Promise<Blob | null> {
+export async function loadRecording(id?: string): Promise<Recording | null> {
   try {
-    if (id) return (await run<StoredRecording | undefined>("readonly", (s) => s.get(id)))?.blob ?? null;
-    const all = await run<StoredRecording[]>("readonly", (s) => s.getAll());
-    return all.sort((a, b) => b.saved_at - a.saved_at)[0]?.blob ?? null;
+    const found = id
+      ? await run<StoredRecording | undefined>("readonly", (s) => s.get(id))
+      : (await run<StoredRecording[]>("readonly", (s) => s.getAll())).sort((a, b) => b.saved_at - a.saved_at)[0];
+    return found ? { blob: found.blob, cuts: found.cuts ?? [] } : null;
   } catch (err) {
     console.warn("[recordings] could not load:", err);
     return null;
   }
+}
+
+/**
+ * Session time (seconds, what events and Work Map moments use) → position in the video.
+ * Subtracts every off-the-record span before that moment; a moment inside a span maps to where it began.
+ */
+export function toVideoSeconds(sessionS: number, cuts: Cut[]): number {
+  const ms = sessionS * 1000;
+  let removed = 0;
+  for (const c of cuts) {
+    if (c.from >= ms) break;
+    removed += Math.min(c.to, ms) - c.from;
+  }
+  return Math.max(0, (ms - removed) / 1000);
 }
 
 /** Delete every stored recording. Used by the demo reset. */

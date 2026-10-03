@@ -198,6 +198,36 @@
 .erp-ok::before { content: "✓"; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ok-soft); font-size: 11px; }
 .erp-gr { margin-left: auto; font-size: 12px; color: var(--muted); }
 
+/* Off the record */
+.erp-offrec {
+  padding: 10px 20px;
+  background: repeating-linear-gradient(-45deg, #18181b, #18181b 12px, #27272a 12px, #27272a 24px);
+  color: #fafafa;
+  font-size: 13px;
+  text-align: center;
+}
+.erp-offrec b { color: #fde68a; margin-right: 4px; }
+.erp-offrec-btn {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  font-weight: 600;
+  box-shadow: 0 10px 30px -10px rgba(16, 24, 40, 0.35);
+}
+.erp-offrec-btn i { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); animation: erp-rec 1.4s ease-in-out infinite; }
+.erp-offrec-btn.on { background: #18181b; color: #fafafa; border-color: #18181b; }
+.erp-offrec-btn.on i { background: #a1a1aa; box-shadow: none; animation: none; }
+@keyframes erp-rec { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .erp-offrec-btn i { animation: none; } }
+
 @media (max-width: 860px) {
   .erp-body { grid-template-columns: 1fr; }
   .erp-list { border-right: 0; border-bottom: 1px solid var(--rule); }
