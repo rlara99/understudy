@@ -69,18 +69,41 @@ function Panel() {
 
   // ERP events -> agent context (silent) + pause detector
   useEffect(() => {
-    return onErpEvent((raw) => {
+    const record = (e: ErpEvent) => {
+      setLog((l) => ({ ...l, events: [...l.events, e] }));
+      if (!connected) return;
+      conv.current.sendContextualUpdate(`[SCREEN] ${formatMs(e.t)} ${describe(e)}`);
+      if (e.type === "field_change") pause.current.decision(describe(e));
+    };
+    // The ERP fires field_change on every keystroke. Merge them per field and
+    // record one change ("4711" -> "0400") once typing in that field stops.
+    const pending = new Map<string, { event: ErpEvent; timer: ReturnType<typeof setTimeout> }>();
+    const unsubscribe = onErpEvent((raw) => {
       const e = { ...raw, t: raw.t - startRef.current };
       if (e.type === "keystroke") {
         pause.current.activity();
         if (connected) conv.current.sendUserActivity();
         return;
       }
-      setLog((l) => ({ ...l, events: [...l.events, e] }));
-      if (!connected) return;
-      conv.current.sendContextualUpdate(`[SCREEN] ${formatMs(e.t)} ${describe(e)}`);
-      if (e.type === "field_change") pause.current.decision(describe(e));
+      if (e.type === "field_change") {
+        pause.current.activity();
+        const key = `${e.invoice}.${e.field}`;
+        const prev = pending.get(key);
+        if (prev) clearTimeout(prev.timer);
+        const event = prev ? { ...prev.event, to: e.to } : e;
+        const timer = setTimeout(() => {
+          pending.delete(key);
+          if (event.from !== event.to) record(event);
+        }, 1200);
+        pending.set(key, { event, timer });
+        return;
+      }
+      record(e);
     });
+    return () => {
+      pending.forEach((p) => clearTimeout(p.timer));
+      unsubscribe();
+    };
   }, [connected]);
 
   // Pause check: nudge one question when the expert pauses after a decision
