@@ -4,22 +4,23 @@ Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLab
 
 An AI apprentice that captures an expert's judgment while they work (Capture), turns it into a Work Map (Map), coaches new hires on unseen cases (Teach), and sends questions it can't answer back to the right expert (the **Gap Loop**, our differentiator).
 
-## Status (end of build day)
+## Status
 
-All three required modules and the Gap Loop work end to end and were tested live:
+**The desktop app works end to end and was tested live by Renzo (Oct 3, evening):** Expert (Work mode live + record, Debrief & teach, Expert Minute) and Learner (Assistant, Knowledge Repository, Expert Minute), with the ERP as a separate app.
 
 | Piece | State |
 |---|---|
-| Capture | Works. Claudia asks at task completion (save or switching invoice), judges ask vs. acknowledge, reacts briefly to answers. |
-| Map + debrief | Works. Finish task → draft map + gaps (~15–30 s) → spoken debrief (3–5 questions, teach-back, capped at 3:30) → Confirm. |
-| Teach | Works. Blocked save of INV-5102 as opex → clip plays → predict-then-explain. Mastery shows in the Knowledge Repository. |
-| Gap Loop | Works. USD invoice flagged → routed to Marta → voice Quick Ask in Expert Minute → Work Map patched → badge clears. Duplicates merge ("asked by N"). |
-| Trust | Personal fields blurred; Off the record (ERP button, panel button, or spoken) pauses recording, events, mic and transcript. |
-| README | Done. |
+| Work mode: live | Works. Claudia asks at task completion (save / switching invoice / vision "task done"), judges ask vs. acknowledge, reacts briefly. Stays quiet through silence. Sessions are **named** and can be **continued** (part 2, 3…). |
+| Work mode: record and learn | Works. Screen + mic (+ opt-in call audio) → ElevenLabs Scribe v2 transcript. No questions. |
+| Debrief & teach | Works. Sessions grouped **by name** (all parts together) → one draft map + gaps → 5-minute spoken debrief → Confirm → map named after the session. |
+| Assistant (Teach) | Works. Blocked save of INV-5102 as opex → clip + predict-then-explain. Typed or spoken questions; unknowns flagged to the learner's Expert Minute. |
+| Gap Loop | Works. Flagged → routed (Marta) → voice Quick Ask → map patched → badge clears. Duplicates merge ("asked by N"). |
+| Trust | Personal fields blurred; Off the record (ERP button, panel button, or spoken) pauses recording, events, mic and transcript. **Delete anything** (sessions + recordings, maps, steps, questions). |
+| README | Done (web version; update for desktop before submitting). |
 
-**Still to do:** clean full run after **Reset demo** (also the first end-to-end test of the 3:30 debrief), backup demo video (Pablo), pitch slides with the 5 Apprentice Test answers and a moonshot slide. Optional stretch: "Export for agents" (Work Map → agent instructions).
+**Still to do:** Pablo's delete buttons in his screens (prompt sent), clean full run after **Reset demo** (delete rehearsal sessions/maps first), backup demo video (Pablo), pitch slides (5 Apprentice Test answers + moonshot), README update for the desktop app. Optional: "Export for agents" (Work Map → agent instructions), packaged installer.
 
-## Desktop app (in progress)
+## Desktop app
 
 Electron app in this repo (`desktop/`), wrapping the same React app and server. Two modes, three modules each:
 
@@ -67,10 +68,19 @@ Session routes render bare (no sidebar) in a browser too, as specified above. `#
 | Debrief and teach | `expert/debrief` | `DebriefModule` | main window, inside the shell | link to `#/expert/debrief` |
 | Assistant | `learner/assistant` | `TutorPanel` (titled Assistant) | companion (bare route) | `openSession(SESSION_ROUTES.assistant)` |
 
-Keep the bare routes (`work/live`, `work/record`, `learner/assistant`) rendering without the shell; they run in the 420 px companion window. Work mode's "Go to Debrief & teach" calls `closeSession("expert/debrief")`.
+Keep the bare routes (`work/live`, `work/record`, `learner/assistant`) rendering without the shell; they run in the 420 px companion window. Work mode's "Go to Debrief & teach" calls `closeSession("expert/debrief")`, which closes the companion and switches the main window to that route (`window.understudy.showInMain`, IPC `main:navigate`).
+
+How Renzo's modules behave (so the shell copy matches):
+- **Naming and continuing:** Work mode setup asks for a session name and lists earlier un-debriefed sessions of the same kind ("Or continue an earlier one"). Continuing saves a new session file with the same `name` and `part = n + 1`; each part has its own recording, so clips stay aligned. Titles: `name` (+ " · part n").
+- **Debrief & teach** lists one row per `name` (all parts), ticks today's un-debriefed ones, and passes `workflow = name` when one name is selected. 5:00 cap (wrap-up nudge at 3:45, time-up at 4:40). Each row has a two-click **Delete** (all parts + recordings).
+- **Greeting:** full introduction the first time per computer, then a short one (`greeting()` in `src/agents/prompts.ts`, localStorage).
+- **Silence:** prompts tell both agents that "..." / silence is normal (no "Are you still there?"). Dashboard: **Advanced → Take turn after silence = 30 s** on both agents.
+- **Mic:** closed from the moment the app sends Claudia a message she must answer until she has finished speaking (`useMicHold`, max 5 s if she never starts), so noise can't cancel her reply; if she's still interrupted, the question is resent once. It is **never** closed after the user's own speech (that cut answers off mid-sentence). Live mode shows a mic level bar; Debug logs "heard you: …".
+- Vision (`/api/frame`) runs every 3 s (live) / 6 s (record) / 4 s (Assistant) on changed frames only, pauses while the ERP is sending events, and ignores the Understudy/Claudia window itself.
 
 APIs for the shell:
-- `GET /api/sessions` (newest first; `mode` live/record/capture, `title`, `reviewed_in`, counts).
+- `GET /api/sessions` (newest first; `mode` live/record/capture, `name`, `part`, `title`, `reviewed_in`, counts).
+- **Deletes:** use `<ConfirmDelete what="…" onConfirm={…} />` (`src/shared/ConfirmDelete.tsx`, two clicks) with `deleteSession(id)` (also deletes its recording), `deleteWorkMap(id)` (its sessions become debriefable again), `deleteStep(mapId, stepId)` (orphaned guardrails go too; returns the map), `deleteQuestion(mapId, qid)` (returns the map) from `src/shared/deletes.ts`. Pablo is adding buttons to the Knowledge Repository, Work Map page and both Expert Minutes.
 - Learner Expert Minute: `GET /api/questions?asker=Lena` (status, answer, route_to, map_id) and `POST /api/questions { question, context?, asker: "Lena" }` (routes, merges duplicates; returns `{ question, merged, map_id }`). `LEARNER = "Lena"` is exported from `src/panel/TutorPanel.tsx`.
 - Expert Minute (expert side): open questions are in each map's `open_questions`; voice answers still go through `#/panel` via `setPendingQuickAsk(...)` (ApprenticePanel quick ask).
 - Knowledge Repository clips: a step's recording is `step.moment.session ?? map.id` (maps built from several sessions set `moment.session`). Pass that as `ClipPlayer sessionId`.
@@ -90,7 +100,7 @@ Restart `npm run dev` after changing any `.env*` file. Only one copy can run (po
 
 | Role | Windows | Steps |
 |---|---|---|
-| Expert (Sabrina) | ERP `/erp/` + Understudy Expert › Work mode: live | Start session (share the ERP) → INV-4471 cost center 4711→0400, INV-4472 approval → second, INV-4473 status → held, saving each → then Debrief and teach → Confirm Work Map |
+| Expert (Sabrina) | ERP `/erp/` + Understudy Expert › Work mode: live | Start live session, name it "Supplier invoices" (or continue it) → INV-4471 cost center 4711→0400, INV-4472 approval → second, INV-4473 status → held, saving each → Finish → Debrief and teach → tick "Supplier invoices" → Prepare → 5-minute debrief → Confirm Work Map |
 | New hire (Lena) | ERP `/erp/#/teach` + Understudy Learner › Assistant | Start assistant → INV-5102 saved as opex gets blocked → fix to 0400 + asset no. → INV-5103 (USD): "Sabrina never showed me this" → flagged. Knowledge Repository shows the walkthrough and her mastery. |
 | Other expert (Marta) | Understudy Expert › Expert Minute | Start voice session → Start Quick Ask → answer → "that's saved" |
 | Anyone | Sidebar | **Reset demo** restores the ERP, the sample map, progress and recordings. |
@@ -152,11 +162,15 @@ Git: `git pull` before starting, commit small, work on `main`. Generated session
 
 ### API (`server/`)
 
-- `GET /api/invoices`, `/api/experts`, `/api/workmaps`; `GET|PUT /api/workmaps/:id`, `/api/sessions/:id`
-- `POST /api/map` `{ sessionId, workflow, expert, team, confirm?, debriefStartedAt? }` → `{ map, gaps }`. First call drafts; `confirm: true` folds debrief answers in and marks confirmed. Ignores off-record spans.
-- `POST /api/route` `{ question, context?, open? }` → `{ expert_name, reason, neutral_question, duplicate_of }`. Short, general question; duplicate detection.
-- `POST /api/patch` `{ workmapId, questionId, answer, expert }` → map with a new step and guardrails; stores a cleaned `answer_clean` built from the confirmed repeat-back.
-- `POST /api/frame` (vision frames, optional, unused in the demo).
+- `GET /api/invoices`, `/api/experts`, `/api/workmaps`, `/api/sessions` (summaries); `GET|PUT /api/workmaps/:id`, `/api/sessions/:id`
+- `POST /api/map` `{ sessionIds | sessionId, workflow?, expert, team, mapId?, confirm?, debrief? }` → `{ map, gaps }`. First call drafts from one or more sessions (map id = the session id, or `map-<ts>` for several); `confirm: true` with the same `mapId` and the debrief transcript folds the answers in, marks confirmed and sets the sessions' `reviewed_in`. Ignores off-record spans. Steps carry `moment.session` (whose recording).
+- `POST /api/route` `{ question, context?, open? }` → `{ expert_name, reason, neutral_question, duplicate_of }`.
+- `POST /api/questions` `{ question, context?, asker?, mapId? }` → `{ question, merged, map_id }` (routed + merged into the newest confirmed map); `GET /api/questions?asker=`.
+- `POST /api/patch` `{ workmapId, questionId, answer, expert }` → map with a new step and guardrails; stores `answer_clean` built from the confirmed repeat-back.
+- `POST /api/frame` `{ image, previous? }` → `{ app, changes[], task_done, judgment_call }` (Haiku, structured). Used by live, record and Assistant.
+- `POST /api/transcribe?speaker=expert|other&offset=ms` (raw audio body) → `{ lines }` via ElevenLabs Scribe v2 (`ELEVENLABS_API_KEY`).
+- `DELETE /api/sessions/:id`, `/api/workmaps/:id`, `/api/workmaps/:id/steps/:stepId`, `/api/workmaps/:id/questions/:qid`.
+- Relay: `POST|GET(SSE) /api/relay/:channel`.
 
 Claude goes through **MIT Parley** (Anthropic-compatible; the key does NOT start with `sk-ant-`). `server/env.ts` loads `.env` with override so a shell-level `ANTHROPIC_BASE_URL` can't win. Models: `claude-opus-5-5` (map, route, patch), `claude-haiku-4-5` (frames); override via `MAP_MODEL` / `FRAME_MODEL`. Structured outputs via `client.messages.parse` + zod (`server/claude.ts`).
 
@@ -166,12 +180,18 @@ Claude goes through **MIT Parley** (Anthropic-compatible; the key does NOT start
 - Both are named **Claudia** (`AGENT_NAME`); the expert persona is **Sabrina**. Prompts and first messages live in `src/agents/prompts.ts` and are sent as **session overrides**: edit the code, not the dashboard. Each agent needs System prompt + First message overrides enabled in its Security tab. Interviewer has the Skip turn system tool on.
 - Dynamic variables: `agent_name`, `expert_name`, plus `mode` (live | debrief | quick_ask) for the Interviewer.
 - App → agent message prefixes. `[SCREEN]`, `[WORKMAP]`, `[OFF RECORD]`, `[ON RECORD]` are silent context updates. `[TASK DONE]`, `[PAUSE]`, `[GAPS]`, `[WRAP UP]`, `[TIME UP]`, `[QUESTION]`, `[ADDRESSED]`, `[OPENED]`, `[BLOCKED]`, `[SAVED]` are user messages that trigger a reply.
-- Timing (`src/agents/pauseRule.ts`): main trigger = task done; mid-task only important fields (cost_center, approval, status) after a 2.5 s pause; 8 s minimum gap; resend once if unanswered after 5 s.
-- Mic: picker in both panels; mic muted while the agent speaks (half-duplex, against background noise) unless "Let me interrupt" is ticked; muted while off the record.
+- Timing (`src/agents/pauseRule.ts`): main trigger = task done; mid-task only important fields (cost_center, approval, status) after a 2.5 s pause; 8 s minimum gap; resend once if unanswered after 5 s or if interrupted.
+- Mic: picker in every session; closed while Claudia answers an app message (`useMicHold`) and while off the record; never closed after the user's own speech.
+- Dashboard settings that matter (both agents): Security → overrides for System prompt + First message; Advanced → **Take turn after silence = 30 s**; Interviewer: Tools → **Skip turn** on. A fast LLM keeps replies snappy (both currently use the model Renzo picked; Haiku-class is faster than Opus).
+- Spoken "let's debrief" was tried and **removed**: the debrief starts only from the Debrief & teach module.
 
 ## Lessons / gotchas
 
 - **Never call `sendUserActivity`** on keystrokes: it holds the agent ~2 s and silently swallowed our nudges.
+- **Background noise cancels the agent's reply** in the 1–2 s while it prepares it, not only while it speaks. Hence `useMicHold` from the nudge on. But don't close the mic after the user speaks: a short pause mid-answer ends their turn and the rest of the sentence is lost.
+- **"Are you still there?"** comes from ElevenLabs' silence turn ("..." as a user message). Fixed in the prompts + Take turn after silence = 30 s.
+- Vision described the Claudia companion window as "work" (messy titles); the frame prompt now ignores it.
+- Changes to `desktop/main.cjs` / `preload.cjs` need an app restart (Ctrl+C, `npm run desktop`); everything in `src/` hot-reloads (Ctrl+R in a window, or reopen the companion).
 - If the agent "goes silent" on nudges, check the Debug list in the panel first, then the agent's Call history and LLM setting in the dashboard.
 - Gaps and guardrail checks: the map prompt must tell Claude to approximate checks with available fields (e.g. amount > 5000 EUR for "equipment"), otherwise the capex rule has no check and Teach can't catch the demo mistake.
 - Voice answers are messy transcripts; the patch uses the agent's confirmed repeat-back to store a clean answer.
