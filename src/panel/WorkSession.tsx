@@ -6,7 +6,7 @@
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
 import { IMPORTANT_FIELDS, PauseDetector } from "../agents/pauseRule";
-import { AGENT_NAME, INTERVIEWER_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
+import { AGENT_NAME, INTERVIEWER_PROMPT, greeting } from "../agents/prompts";
 import { useScreenRecorder } from "../capture/useScreenRecorder";
 import { getJson, postJson, putJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
@@ -27,8 +27,6 @@ interface FrameResult {
 }
 
 const EXPERT = "Sabrina M.";
-/** "Let's debrief" as speech-to-text tends to write it (debrief, de-brief, be brief, the brief). */
-const DEBRIEF_RE = /\b(de-?\s?brief(ing)?|let'?s (be|the) brief|time (to|for) (the |a )?(de)?brief)\b/i;
 const NAME_RE = new RegExp(`\\b(${AGENT_NAME}|cloudia|klaudia|claudio|clodia)\\b`, "i");
 /** While the ERP sends exact events, skip vision (cheaper, and no double questions). */
 const ERP_QUIET_MS = 10_000;
@@ -87,8 +85,6 @@ function Session({ mode }: { mode: Mode }) {
   logRef.current = log;
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
-  /** Latest finish(), for the spoken "let's debrief" command inside the conversation callbacks. */
-  const finishRef = useRef<((goToDebrief?: boolean) => Promise<void>) | null>(null);
   const offRef = useRef(screen.offRecord);
   offRef.current = screen.offRecord;
   const pause = useRef(new PauseDetector());
@@ -131,12 +127,6 @@ function Session({ mode }: { mode: Mode }) {
       } else {
         if (/\boff the record\b/i.test(message) && !/\bback on\b/i.test(message)) {
           screen.setOffRecord(true);
-          return;
-        }
-        // "Let's debrief": save this session and open Debrief & teach in the main window.
-        if (DEBRIEF_RE.test(message)) {
-          note("debrief requested by voice");
-          finishRef.current?.(true);
           return;
         }
         pause.current.activity();
@@ -338,7 +328,7 @@ function Session({ mode }: { mode: Mode }) {
         connectionType: "webrtc",
         inputDeviceId: micId || undefined,
         dynamicVariables: { mode: "live", expert_name: EXPERT.split(" ")[0], agent_name: AGENT_NAME },
-        overrides: { agent: { prompt: { prompt: INTERVIEWER_PROMPT }, firstMessage: INTERVIEWER_FIRST_MESSAGE } },
+        overrides: { agent: { prompt: { prompt: INTERVIEWER_PROMPT }, firstMessage: greeting("interviewer") } },
       });
     } else {
       try {
@@ -380,7 +370,6 @@ function Session({ mode }: { mode: Mode }) {
       setPhase("running");
     }
   };
-  finishRef.current = finish;
 
   const transcript = live ? log.transcript : audio.lines;
 

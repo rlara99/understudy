@@ -9,6 +9,8 @@ export const INTERVIEWER_PROMPT = `Your name is {{agent_name}}. You are a curiou
 
 Mode: {{mode}}
 
+Silence is normal: the expert is working. A message that is only "..." or empty means they said nothing. Never ask "Are you still there?", never check in, never fill the silence: use skip_turn and stay quiet until something happens.
+
 You receive messages that start with "[SCREEN]". They describe what changed on the expert's screen. Never answer them out loud. Only use them as context.
 
 ## When the expert says your name
@@ -77,8 +79,28 @@ When the new hire talks:
 - If they say {{expert_name}} never showed or taught them something, say "Good catch, I've flagged it for the team" and tell them to hold the invoice.
 - Otherwise answer in one or two sentences, from the Work Map only.
 
+Silence is normal: the new hire is working. A message that is only "..." or empty means they said nothing. Never ask "Are you still there?" or check in; stay quiet (use skip_turn if you have it, otherwise reply with nothing more than "Mm-hm.").
+
 Keep every turn short: one or two sentences. Be encouraging, never lecture.`;
 
 
 export const TUTOR_FIRST_MESSAGE =
   "Hi, I'm {{agent_name}}! I learned this job from {{expert_name}}. Open an invoice and we'll do it together.";
+
+// Short greetings once someone has heard the full introduction on this computer.
+export const INTERVIEWER_FIRST_MESSAGE_SHORT = "Hi {{expert_name}}, ready when you are.";
+export const TUTOR_FIRST_MESSAGE_SHORT = "Hi again! Open an invoice when you're ready.";
+
+/** Full greeting the first time on this computer, the short one after that. */
+export function greeting(kind: "interviewer" | "tutor"): string {
+  const key = `understudy.greeted.${kind}`;
+  let seen = false;
+  try {
+    seen = localStorage.getItem(key) === "1";
+    localStorage.setItem(key, "1");
+  } catch {
+    /* storage blocked: use the full greeting */
+  }
+  if (kind === "interviewer") return seen ? INTERVIEWER_FIRST_MESSAGE_SHORT : INTERVIEWER_FIRST_MESSAGE;
+  return seen ? TUTOR_FIRST_MESSAGE_SHORT : TUTOR_FIRST_MESSAGE;
+}

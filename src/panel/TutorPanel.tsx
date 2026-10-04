@@ -5,7 +5,7 @@
 // - A case the map doesn't cover -> flagged as an open question, routed to the right expert (Gap Loop).
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useEffect, useRef, useState } from "react";
-import { AGENT_NAME, TUTOR_FIRST_MESSAGE, TUTOR_PROMPT } from "../agents/prompts";
+import { AGENT_NAME, TUTOR_PROMPT, greeting } from "../agents/prompts";
 import { ClipPlayer } from "../capture/ClipPlayer";
 import { getJson, postJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
@@ -252,7 +252,7 @@ function Tutor() {
       connectionType: "webrtc",
       inputDeviceId: micId || undefined,
       dynamicVariables: { expert_name: EXPERT_FIRST_NAME, agent_name: AGENT_NAME },
-      overrides: { agent: { prompt: { prompt: TUTOR_PROMPT }, firstMessage: TUTOR_FIRST_MESSAGE } },
+      overrides: { agent: { prompt: { prompt: TUTOR_PROMPT }, firstMessage: greeting("tutor") } },
       // Optional: also define these as client tools in the Tutor agent's dashboard to let it call them.
       clientTools: {
         replay_moment: ({ step_id }: { step_id?: string }) => {
