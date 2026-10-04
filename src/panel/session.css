@@ -32,3 +32,7 @@
 .ws-day { display: flex; flex-direction: column; gap: 8px; }
 .ws-day + .ws-day { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule, #e4e4e7); }
 .ws-day-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ws-day-select { display: inline-flex; align-items: center; gap: 4px; color: var(--muted, #71717a); cursor: pointer; }
+.ws-pick-actions { align-items: center; }
+.ws-pick-actions .ws-primary { flex: 1; }
+.ws-pick-actions .confirm-delete-ask, .ws-pick-actions > .confirm-delete { flex: none; min-width: 0; }

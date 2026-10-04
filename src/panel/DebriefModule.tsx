@@ -239,11 +239,14 @@ function Debrief() {
                       {dayIds.length ? ` · ${dayIds.length} recording${dayIds.length === 1 ? "" : "s"}` : ""}
                     </h3>
                     {dayIds.length > 0 && (
-                      <ConfirmDelete
-                        label="Delete all from this day"
-                        what={`all ${dayIds.length} recording${dayIds.length === 1 ? "" : "s"} from ${label === "Today" || label === "Yesterday" ? label.toLowerCase() : label}`}
-                        onConfirm={() => removeSessions(dayIds)}
-                      />
+                      <label className="ws-day-select small">
+                        <input
+                          type="checkbox"
+                          checked={dayIds.every((id) => selected.includes(id))}
+                          onChange={() => toggleGroup(dayIds)}
+                        />{" "}
+                        Select day
+                      </label>
                     )}
                   </div>
                   {day.groups.length === 0 && (
@@ -279,9 +282,18 @@ function Debrief() {
                 </div>
               );
             })}
-          <button type="button" className="ws-primary" disabled={selected.length === 0} onClick={prepare}>
-            Prepare debrief ({selected.length} recording{selected.length === 1 ? "" : "s"})
-          </button>
+          <div className="ws-actions ws-pick-actions">
+            <button type="button" className="ws-primary" disabled={selected.length === 0} onClick={prepare}>
+              Prepare debrief ({selected.length} recording{selected.length === 1 ? "" : "s"})
+            </button>
+            {selected.length > 0 && (
+              <ConfirmDelete
+                label={`Delete selected (${selected.length})`}
+                what={`the ${selected.length} selected recording${selected.length === 1 ? "" : "s"}`}
+                onConfirm={() => removeSessions([...selected])}
+              />
+            )}
+          </div>
         </section>
       )}
 
