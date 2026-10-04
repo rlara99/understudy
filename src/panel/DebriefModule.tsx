@@ -185,8 +185,34 @@ function Debrief() {
   })();
   const toggleGroup = (ids: string[]) =>
     setSelected((s) => (ids.every((id) => s.includes(id)) ? s.filter((x) => !ids.includes(x)) : [...new Set([...s, ...ids])]));
-  const today = groups.filter((g) => isToday(g.last));
-  const earlier = groups.filter((g) => !isToday(g.last)).slice(0, 10);
+  // Sections by day (a named session sits under the day of its latest part).
+  const dayKey = (iso: string) => new Date(iso).toDateString();
+  const dayLabel = (key: string) => {
+    const d = new Date(key);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (key === new Date().toDateString()) return "Today";
+    if (key === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  };
+  const days: { key: string; groups: typeof groups }[] = [];
+  for (const g of groups) {
+    const key = dayKey(g.last);
+    const day = days.find((d) => d.key === key) ?? (days.push({ key, groups: [] }), days[days.length - 1]);
+    day.groups.push(g);
+  }
+  if (!days.some((d) => d.key === new Date().toDateString())) days.unshift({ key: new Date().toDateString(), groups: [] });
+  const shownDays = days.slice(0, 14);
+
+  const removeSessions = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => deleteSession(id)));
+      setSessions((all) => (all ?? []).filter((s) => !ids.includes(s.id)));
+      setSelected((sel) => sel.filter((id) => !ids.includes(id)));
+    } catch (e) {
+      setError(`Could not delete: ${String(e)}`);
+    }
+  };
 
   return (
     <div className="ws" style={{ maxWidth: 720 }}>
@@ -199,42 +225,60 @@ function Debrief() {
 
       {phase === "pick" && (
         <section className="ws-setup">
-          <h3 className="eyebrow">Today</h3>
           {sessions === null && <p className="muted">Loading sessions…</p>}
-          {sessions !== null && today.length === 0 && <p className="muted">No sessions recorded today yet. Start Work mode first.</p>}
-          {[...today, ...earlier].map((g, i) => {
-            const ids = g.parts.map((p) => p.id);
-            const events = g.parts.reduce((n, p) => n + p.event_count, 0);
-            const lines = g.parts.reduce((n, p) => n + p.transcript_count, 0);
-            const kinds = [...new Set(g.parts.map((p) => (p.mode === "record" ? "recorded" : "live")))].join(" + ");
-            return (
-              <label key={g.key} className="ws-check" style={i === today.length && i > 0 ? { marginTop: 12 } : undefined}>
-                <input type="checkbox" checked={ids.every((id) => selected.includes(id))} onChange={() => toggleGroup(ids)} />
-                <span>
-                  <b>{g.label}</b>
-                  <span className="muted small">
-                    {isToday(g.last) ? timeOf(g.last) : new Date(g.last).toLocaleDateString()} · {kinds}
-                    {g.parts.length > 1 ? ` · ${g.parts.length} parts` : ""} · {events} events · {lines} lines
-                    {g.parts.every((p) => p.reviewed_in) ? " · already reviewed" : ""}
-                  </span>
-                </span>
-                <span style={{ marginLeft: "auto" }}>
-                  <ConfirmDelete
-                    what={g.parts.length > 1 ? `all ${g.parts.length} parts and their recordings` : "this session and its recording"}
-                    onConfirm={async () => {
-                      try {
-                        await Promise.all(ids.map((id) => deleteSession(id)));
-                        setSessions((all) => (all ?? []).filter((s) => !ids.includes(s.id)));
-                        setSelected((sel) => sel.filter((id) => !ids.includes(id)));
-                      } catch (e) {
-                        setError(`Could not delete: ${String(e)}`);
-                      }
-                    }}
-                  />
-                </span>
-              </label>
-            );
-          })}
+          {sessions !== null &&
+            shownDays.map((day) => {
+              // Every session file started that day (parts of a name can span days; only this day's go).
+              const dayIds = (sessions ?? []).filter((x) => dayKey(x.started_at) === day.key).map((x) => x.id);
+              const label = dayLabel(day.key);
+              return (
+                <div key={day.key} className="ws-day">
+                  <div className="ws-day-head">
+                    <h3 className="eyebrow" style={{ margin: 0 }}>
+                      {label}
+                      {dayIds.length ? ` · ${dayIds.length} recording${dayIds.length === 1 ? "" : "s"}` : ""}
+                    </h3>
+                    {dayIds.length > 0 && (
+                      <ConfirmDelete
+                        label="Delete all from this day"
+                        what={`all ${dayIds.length} recording${dayIds.length === 1 ? "" : "s"} from ${label === "Today" || label === "Yesterday" ? label.toLowerCase() : label}`}
+                        onConfirm={() => removeSessions(dayIds)}
+                      />
+                    )}
+                  </div>
+                  {day.groups.length === 0 && (
+                    <p className="muted small" style={{ margin: 0 }}>
+                      {label === "Today" ? "No sessions recorded today yet. Start Work mode first." : "No sessions this day."}
+                    </p>
+                  )}
+                  {day.groups.map((g) => {
+                    const ids = g.parts.map((x) => x.id);
+                    const events = g.parts.reduce((n, x) => n + x.event_count, 0);
+                    const lines = g.parts.reduce((n, x) => n + x.transcript_count, 0);
+                    const kinds = [...new Set(g.parts.map((x) => (x.mode === "record" ? "recorded" : "live")))].join(" + ");
+                    return (
+                      <label key={g.key} className="ws-check">
+                        <input type="checkbox" checked={ids.every((id) => selected.includes(id))} onChange={() => toggleGroup(ids)} />
+                        <span>
+                          <b>{g.label}</b>
+                          <span className="muted small">
+                            {timeOf(g.last)} · {kinds}
+                            {g.parts.length > 1 ? ` · ${g.parts.length} parts` : ""} · {events} events · {lines} lines
+                            {g.parts.every((x) => x.reviewed_in) ? " · already reviewed" : ""}
+                          </span>
+                        </span>
+                        <span style={{ marginLeft: "auto" }}>
+                          <ConfirmDelete
+                            what={g.parts.length > 1 ? `all ${g.parts.length} parts and their recordings` : "this session and its recording"}
+                            onConfirm={() => removeSessions(ids)}
+                          />
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              );
+            })}
           <button type="button" className="ws-primary" disabled={selected.length === 0} onClick={prepare}>
             Prepare debrief ({selected.length} recording{selected.length === 1 ? "" : "s"})
           </button>
