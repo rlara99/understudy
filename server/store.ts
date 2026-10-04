@@ -14,6 +14,27 @@ export async function writeJson(rel: string, value: unknown): Promise<void> {
   await fs.writeFile(file, JSON.stringify(value, null, 2) + "\n", "utf8");
 }
 
+const locks = new Map<string, Promise<unknown>>();
+
+/**
+ * Read, change and write one file, one change at a time per file, so a slow change (e.g. a Claude call
+ * before it) can't undo another one. `change` gets the current contents; return null to write nothing.
+ */
+export async function updateJson<T>(rel: string, change: (current: T) => T | null | Promise<T | null>): Promise<T | null> {
+  const run = (locks.get(rel) ?? Promise.resolve()).then(async () => {
+    const next = await change(await readJson<T>(rel));
+    if (next) await writeJson(rel, next);
+    return next;
+  });
+  const tail = run.catch(() => {});
+  locks.set(rel, tail);
+  try {
+    return await run;
+  } finally {
+    if (locks.get(rel) === tail) locks.delete(rel);
+  }
+}
+
 export async function listJson<T>(dir: string): Promise<T[]> {
   const full = path.join(DATA, dir);
   await fs.mkdir(full, { recursive: true });

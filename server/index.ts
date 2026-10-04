@@ -39,4 +39,5 @@ const onError: ErrorRequestHandler = (err, _req, res, _next) => {
 app.use(onError);
 
 const port = Number(process.env.API_PORT ?? 8787);
-app.listen(port, () => console.log(`API on http://localhost:${port}`));
+// Loopback only: the API has no login and serves transcripts, IBANs and askers' names; nothing else on the network may reach it.
+app.listen(port, "127.0.0.1", () => console.log(`API on http://127.0.0.1:${port}`));

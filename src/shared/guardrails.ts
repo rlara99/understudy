@@ -1,7 +1,7 @@
 // SHARED FILE: evaluates Work Map guardrail checks. Used by the ERP Save hook.
 import type { Condition, Guardrail, Invoice } from "./types";
 
-function holds(invoice: Invoice, c: Condition): boolean {
+export function holds(invoice: Invoice, c: Condition): boolean {
   const actual = invoice[c.field];
   switch (c.op) {
     case "present":

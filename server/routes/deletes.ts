@@ -5,7 +5,7 @@
 // DELETE /api/workmaps/:id/questions/:qid       one question (open or answered)
 import { Router } from "express";
 import type { SessionLog, WorkMap } from "../../src/shared/types";
-import { deleteJson, listJson, readJson, safeId, writeJson } from "../store";
+import { deleteJson, listJson, safeId, updateJson, writeJson } from "../store";
 
 export const deleteRoutes = Router();
 
@@ -29,29 +29,33 @@ deleteRoutes.delete("/workmaps/:id", async (req, res) => {
 });
 
 deleteRoutes.delete("/workmaps/:id/steps/:stepId", async (req, res) => {
-  const map = await readJson<WorkMap>(`workmaps/${safeId(req.params.id)}.json`);
-  const step = map.steps.find((s) => s.id === req.params.stepId);
-  if (!step) {
+  const map = await updateJson<WorkMap>(`workmaps/${safeId(req.params.id)}.json`, (map) => {
+    const step = map.steps.find((s) => s.id === req.params.stepId);
+    if (!step) return null;
+    map.steps = map.steps.filter((s) => s.id !== step.id);
+    const stillUsed = new Set(map.steps.flatMap((s) => s.guardrails));
+    map.guardrails = map.guardrails.filter((g) => !step.guardrails.includes(g.id) || stillUsed.has(g.id));
+    map.updated_at = new Date().toISOString();
+    return map;
+  });
+  if (!map) {
     res.status(404).json({ error: `Step ${req.params.stepId} not found` });
     return;
   }
-  map.steps = map.steps.filter((s) => s.id !== step.id);
-  const stillUsed = new Set(map.steps.flatMap((s) => s.guardrails));
-  map.guardrails = map.guardrails.filter((g) => !step.guardrails.includes(g.id) || stillUsed.has(g.id));
-  map.updated_at = new Date().toISOString();
-  await writeJson(`workmaps/${map.id}.json`, map);
   res.json(map);
 });
 
 deleteRoutes.delete("/workmaps/:id/questions/:qid", async (req, res) => {
-  const map = await readJson<WorkMap>(`workmaps/${safeId(req.params.id)}.json`);
-  const before = map.open_questions.length;
-  map.open_questions = map.open_questions.filter((q) => q.id !== req.params.qid);
-  if (map.open_questions.length === before) {
+  const map = await updateJson<WorkMap>(`workmaps/${safeId(req.params.id)}.json`, (map) => {
+    const before = map.open_questions.length;
+    map.open_questions = map.open_questions.filter((q) => q.id !== req.params.qid);
+    if (map.open_questions.length === before) return null;
+    map.updated_at = new Date().toISOString();
+    return map;
+  });
+  if (!map) {
     res.status(404).json({ error: `Question ${req.params.qid} not found` });
     return;
   }
-  map.updated_at = new Date().toISOString();
-  await writeJson(`workmaps/${map.id}.json`, map);
   res.json(map);
 });

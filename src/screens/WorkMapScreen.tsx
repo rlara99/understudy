@@ -52,7 +52,7 @@ export function WorkMapScreen({ id }: { id: string }) {
             {map.confirmed ? `Confirmed by ${map.expert}` : "Draft: waiting for teach-back"}
           </span>
           <span className="pill line">
-            {map.steps.length} steps · {map.guardrails.length} guardrails
+            {map.steps.length} step{map.steps.length === 1 ? "" : "s"} · {map.guardrails.length} guardrail{map.guardrails.length === 1 ? "" : "s"}
           </span>
           {open.length > 0 && <span className="pill gap">{open.length} open</span>}
           <ConfirmDelete
@@ -60,7 +60,8 @@ export function WorkMapScreen({ id }: { id: string }) {
             what="this task and its walkthrough"
             onConfirm={async () => {
               await deleteWorkMap(map.id);
-              location.hash = "#/learner/knowledge";
+              // Stay in Expert mode: the map's sessions are debriefable again there.
+              location.hash = "#/expert/debrief";
             }}
           />
         </div>
@@ -80,7 +81,7 @@ export function WorkMapScreen({ id }: { id: string }) {
                   <span className="wm-step-title">{s.title}</span>
                   <span className="muted small">{s.decision}</span>
                 </span>
-                <span className="t">{s.moment.t}</span>
+                <span className="t">{s.said_at === "quick ask" ? "Quick Ask" : s.moment.t}</span>
               </button>
             </li>
           ))}
@@ -88,7 +89,12 @@ export function WorkMapScreen({ id }: { id: string }) {
 
         {step && (
           <article className="wm-detail" aria-live="polite">
-            <ClipPlayer key={step.id} at={step.moment.clip_s} sessionId={step.moment.session ?? (map.sample ? undefined : map.id)} />
+            {/* A Quick Ask answer was spoken, not shown: no footage to play. */}
+            {step.said_at === "quick ask" ? (
+              <p className="muted">Answered in a Quick Ask. No screen recording for this step.</p>
+            ) : (
+              <ClipPlayer key={step.id} at={step.moment.clip_s} sessionId={step.moment.session ?? (map.sample ? undefined : map.id)} />
+            )}
             <div className="wm-detail-head">
               <b>
                 Step {map.steps.indexOf(step) + 1}: {step.title}
@@ -105,7 +111,11 @@ export function WorkMapScreen({ id }: { id: string }) {
             <dl className="wm-facts">
               <dt>Moment</dt>
               <dd>
-                <span className="t">{step.moment.t}</span>
+                {step.said_at === "quick ask" ? (
+                  <span className="muted">Quick Ask answer, no recording</span>
+                ) : (
+                  <span className="t">{step.moment.t}</span>
+                )}
               </dd>
               <dt>Decision</dt>
               <dd>{step.decision}</dd>
@@ -113,7 +123,7 @@ export function WorkMapScreen({ id }: { id: string }) {
               <dd>
                 <q>{step.reason}</q>{" "}
                 <span className="muted">
-                  {map.expert}, {step.said_at === "quick ask" ? "Quick Ask" : `said at ${step.said_at}`}
+                  {step.said_by ?? map.expert}, {step.said_at === "quick ask" ? "Quick Ask" : `said at ${step.said_at}`}
                 </span>
               </dd>
               {step.guardrails.length > 0 && (

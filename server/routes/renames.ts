@@ -3,7 +3,7 @@
 // PATCH /api/workmaps/:id     { workflow }  → renames the map; its source sessions get the name too (if they shared one)
 import { Router } from "express";
 import type { SessionLog, WorkMap } from "../../src/shared/types";
-import { listJson, readJson, safeId, writeJson } from "../store";
+import { listJson, readJson, safeId, updateJson, writeJson } from "../store";
 
 export const renameRoutes = Router();
 
@@ -28,7 +28,7 @@ renameRoutes.post("/sessions/rename", async (req, res) => {
   const renamed: string[] = [];
   for (const m of maps) {
     if (m.sources?.length && m.sources.every((s) => ids.includes(s))) {
-      await writeJson(`workmaps/${m.id}.json`, { ...m, workflow: name, updated_at: new Date().toISOString() });
+      await updateJson<WorkMap>(`workmaps/${m.id}.json`, (cur) => ({ ...cur, workflow: name, updated_at: new Date().toISOString() }));
       renamed.push(m.id);
     }
   }
@@ -37,13 +37,15 @@ renameRoutes.post("/sessions/rename", async (req, res) => {
 
 renameRoutes.patch("/workmaps/:id", async (req, res) => {
   const workflow = cleanName(req.body?.workflow);
-  const map = await readJson<WorkMap>(`workmaps/${safeId(req.params.id)}.json`);
-  const updated: WorkMap = { ...map, workflow, updated_at: new Date().toISOString() };
-  await writeJson(`workmaps/${map.id}.json`, updated);
+  const updated = (await updateJson<WorkMap>(`workmaps/${safeId(req.params.id)}.json`, (cur) => ({
+    ...cur,
+    workflow,
+    updated_at: new Date().toISOString(),
+  })))!;
   // Its source sessions follow, if they were one named session (so Debrief & teach matches).
   let sessionsRenamed = 0;
-  if (map.sources?.length) {
-    const logs = (await Promise.all(map.sources.map((id) => readJson<SessionLog>(`sessions/${safeId(id)}.json`).catch(() => null)))).filter(
+  if (updated.sources?.length) {
+    const logs = (await Promise.all(updated.sources.map((id) => readJson<SessionLog>(`sessions/${safeId(id)}.json`).catch(() => null)))).filter(
       (l): l is SessionLog => l !== null,
     );
     const names = new Set(logs.map((l) => l.name ?? ""));

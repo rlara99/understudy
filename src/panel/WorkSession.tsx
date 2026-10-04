@@ -74,6 +74,8 @@ function Session({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<string[]>([]);
   const [elapsed, setElapsed] = useState(0);
+  /** Claudia's session ended while working (dropped connection, failed start): offer Reconnect. */
+  const [lost, setLost] = useState(false);
 
   const screen = useScreenRecorder();
   const audio = useAudioTranscriber();
@@ -119,6 +121,10 @@ function Session({ mode }: { mode: Mode }) {
       }
     },
     onDisconnect: (d) => note(`disconnected: ${JSON.stringify(d).slice(0, 100)}`),
+    onStatusChange: ({ status }) => {
+      // Finish moves the phase on before ending the session, so this is only an unplanned end.
+      if (status === "disconnected" && phaseRef.current === "running") setLost(true);
+    },
     onError: (m) => note(`error: ${String(m)}`),
     onMessage: ({ message, role }) => {
       if (offRef.current) return;
@@ -218,7 +224,8 @@ function Session({ mode }: { mode: Mode }) {
         addEvent(e);
         if (!live || conv.current.status !== "connected") return;
         conv.current.sendContextualUpdate(`[SCREEN] ${formatMs(e.t)} ${previous}`);
-        if (r.judgment_call) pause.current.decision(r.judgment_call, true);
+        // With task_done the judgment call goes into the task-done question; queuing it too would ask twice.
+        if (r.judgment_call && !r.task_done) pause.current.decision(r.judgment_call, true);
         if (r.task_done)
           pendingTaskDone.current = `[TASK DONE] The expert finished: ${r.task_done}.${r.judgment_call ? ` Looks like a judgment call: ${r.judgment_call}.` : ""}`;
       } catch (err) {
@@ -315,6 +322,18 @@ function Session({ mode }: { mode: Mode }) {
   }, [live, connected]);
 
   // ---------- Start / finish ----------
+  /** Start Claudia's session, or start it again after it dropped (the work session and its recording go on). */
+  const connect = () => {
+    setLost(false);
+    conversation.startSession({
+      agentId: import.meta.env.VITE_INTERVIEWER_AGENT_ID,
+      connectionType: "webrtc",
+      inputDeviceId: micId || undefined,
+      dynamicVariables: { mode: "live", expert_name: EXPERT.split(" ")[0], agent_name: AGENT_NAME },
+      overrides: { agent: { prompt: { prompt: INTERVIEWER_PROMPT }, firstMessage: greeting("interviewer") } },
+    });
+  };
+
   const start = async () => {
     setError(null);
     const t0 = await screen.start(logRef.current.id);
@@ -323,13 +342,7 @@ function Session({ mode }: { mode: Mode }) {
     setLog((l) => ({ ...l, started_at: new Date(zero.current).toISOString(), name: name.trim() || undefined, part }));
     setPhase("running");
     if (live) {
-      conversation.startSession({
-        agentId: import.meta.env.VITE_INTERVIEWER_AGENT_ID,
-        connectionType: "webrtc",
-        inputDeviceId: micId || undefined,
-        dynamicVariables: { mode: "live", expert_name: EXPERT.split(" ")[0], agent_name: AGENT_NAME },
-        overrides: { agent: { prompt: { prompt: INTERVIEWER_PROMPT }, firstMessage: greeting("interviewer") } },
-      });
+      connect();
     } else {
       try {
         await audio.start({ zero: zero.current, micId: micId || undefined, withCallAudio });
@@ -464,7 +477,17 @@ function Session({ mode }: { mode: Mode }) {
         <section className="ws-run">
           <div className="ws-status">
             <span>{screen.recording ? "Recording screen" : "Not recording screen"}</span>
-            {live && <span>{connected ? (agentSpeaking ? `${AGENT_NAME} is speaking` : `${AGENT_NAME} is listening`) : "Connecting…"}</span>}
+            {live && (
+              <span>
+                {connected
+                  ? agentSpeaking
+                    ? `${AGENT_NAME} is speaking`
+                    : `${AGENT_NAME} is listening`
+                  : lost
+                    ? `Lost the connection to ${AGENT_NAME}`
+                    : "Connecting…"}
+              </span>
+            )}
             {live && connected && (
               <span className="ws-level" title="Mic level: should move when you talk">
                 Mic <i style={{ width: `${Math.min(100, Math.round(micLevel * 300))}%` }} />
@@ -480,6 +503,11 @@ function Session({ mode }: { mode: Mode }) {
             <button type="button" className={screen.offRecord ? "ws-primary" : ""} onClick={() => screen.setOffRecord(!screen.offRecord)}>
               {screen.offRecord ? "Back on the record" : "Off the record"}
             </button>
+            {live && lost && (
+              <button type="button" onClick={connect}>
+                Reconnect
+              </button>
+            )}
             <button type="button" onClick={() => finish()}>
               Finish
             </button>

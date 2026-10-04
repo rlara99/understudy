@@ -1,12 +1,11 @@
 // Owner: Renzo. Decides when the interviewer may ask a question in the MIDDLE of a task.
 // The main trigger is "task done" (invoice saved or left), handled in the panel.
-// Mid-task, only important decisions (see IMPORTANT_FIELDS) are asked, after a real pause.
+// Mid-task, only important decisions (see IMPORTANT_FIELDS, vision judgment calls) are asked, after a short pause.
+// Minor ones are only kept for the task-done question.
 
 export const IMPORTANT_FIELDS = new Set(["cost_center", "approval", "status"]);
 
 export interface PauseRuleOptions {
-  /** Quiet time needed before asking about a minor decision. */
-  idleMs: number;
   /** Quiet time needed before asking about an important decision (just "not mid-typing"). */
   urgentIdleMs: number;
   /** Forget decisions older than this. */
@@ -30,7 +29,6 @@ export class PauseDetector {
 
   constructor(
     private opts: PauseRuleOptions = {
-      idleMs: 6000,
       urgentIdleMs: 2500,
       decisionWindowMs: 45000,
       maxQuestions: 8,
@@ -58,9 +56,9 @@ export class PauseDetector {
     this.queue = this.queue.filter((p) => now - p.at <= o.decisionWindowMs);
     if (agentSpeaking || this.queue.length === 0) return null;
     if (this.asked >= o.maxQuestions || now - this.lastAsked < o.minGapMs) return null;
-    const next = this.queue.find((p) => p.important) ?? this.queue[0];
-    const quiet = now - this.lastActivity;
-    if (quiet < (next.important ? o.urgentIdleMs : o.idleMs)) return null;
+    // Minor decisions never interrupt mid-task: the task-done question covers them.
+    const next = this.queue.find((p) => p.important);
+    if (!next || now - this.lastActivity < o.urgentIdleMs) return null;
     return next.summary;
   }
 

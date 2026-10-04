@@ -6,6 +6,6 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true, // Electron loads :5173; fail loudly instead of moving ports
-    proxy: { "/api": "http://localhost:8787" },
+    proxy: { "/api": "http://127.0.0.1:8787" }, // the API listens on loopback IPv4 only
   },
 });
