@@ -1,5 +1,6 @@
 // Owner: Pablo. Entry point of the separate ERP app (http://localhost:5173/erp/).
 // #/teach signs in as the trainee; anything else as the expert.
+import "../demo";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "../styles.css";
