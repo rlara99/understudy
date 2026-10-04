@@ -105,7 +105,7 @@ export function KnowledgeRepository() {
                     Taught by {m.expert} · {m.team}
                   </span>
                   <span className="mono small">
-                    {m.steps.length} steps · {m.guardrails.length} rules
+                    {m.steps.length} step{m.steps.length === 1 ? "" : "s"} · {m.guardrails.length} rule{m.guardrails.length === 1 ? "" : "s"}
                   </span>
                   <span className="meter" aria-hidden="true">
                     <span style={{ width: `${mastery.score ?? 0}%` }} />
@@ -169,6 +169,9 @@ export function KnowledgeTask({ id }: { id: string }) {
 
   const steps = map?.steps ?? [];
   const step = steps[Math.min(index, steps.length - 1)];
+  // Expert Minute answers were spoken, not shown: there's no footage to play, so the step is a slide.
+  const noClip = step?.said_at === "quick ask";
+  const slide = noClip || hasVideo === false;
   const status = useMemo(
     () => (map ? new Map(computeMastery(map, progress).steps.map((s) => [s.step.id, s.status])) : new Map()),
     [map, progress],
@@ -179,15 +182,15 @@ export function KnowledgeTask({ id }: { id: string }) {
     else setPlayingAll(false);
   };
 
-  // Without a recording, "Play all" advances like a slideshow.
+  // Without a recording (or on a step with no clip), "Play all" advances like a slideshow.
   useEffect(() => {
-    if (!playingAll || hasVideo !== false) return;
+    if (!playingAll || !slide) return;
     const t = setTimeout(next, SLIDE_MS);
     return () => clearTimeout(t);
   });
 
   if (error) return <p className="muted">{error}</p>;
-  if (!map || !step) return <p className="muted">Loading…</p>;
+  if (!map) return <p className="muted">Loading…</p>;
 
   const guardrail = (gid: string) => map.guardrails.find((g) => g.id === gid);
   const open = map.open_questions.filter((q) => q.status === "open");
@@ -219,82 +222,94 @@ export function KnowledgeTask({ id }: { id: string }) {
       </header>
 
       <div className="kt-body">
-        <section className="kt-player" aria-label="Walkthrough">
-          <div className="kt-stage">
-            {hasVideo === false ? (
-              <div className="kt-slide">
-                <span className="kt-slide-n">Step {index + 1}</span>
-                <b>{step.title}</b>
-                <span>{step.decision}</span>
-                <small>No screen recording for this task yet. The walkthrough shows the steps.</small>
-              </div>
-            ) : null}
-            <div hidden={hasVideo === false}>
-              <ClipPlayer
-                key={step.id}
-                at={step.moment.clip_s}
-                sessionId={step.moment.session ?? (map.sample ? undefined : map.id)}
-                autoPlay={playingAll || index > 0}
-                onClipEnd={() => playingAll && next()}
-                onAvailable={setHasVideo}
-              />
+        {step ? (
+          <section className="kt-player" aria-label="Walkthrough">
+            <div className="kt-stage">
+              {slide ? (
+                <div className="kt-slide">
+                  <span className="kt-slide-n">Step {index + 1}</span>
+                  <b>{step.title}</b>
+                  <span>{step.decision}</span>
+                  <small>
+                    {noClip
+                      ? "Answered in Expert Minute, so there's no screen recording for this step."
+                      : "No screen recording for this task yet. The walkthrough shows the steps."}
+                  </small>
+                </div>
+              ) : null}
+              {/* Not mounted for a step with no clip: hidden, it would still autoplay and end the step early. */}
+              {!noClip && (
+                <div hidden={hasVideo === false}>
+                  <ClipPlayer
+                    key={step.id}
+                    at={step.moment.clip_s}
+                    sessionId={step.moment.session ?? (map.sample ? undefined : map.id)}
+                    autoPlay={playingAll || index > 0}
+                    playing={playingAll}
+                    onClipEnd={() => playingAll && next()}
+                    onAvailable={setHasVideo}
+                  />
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="kt-controls">
-            <button type="button" className="quiet" onClick={() => setIndex(Math.max(0, index - 1))} disabled={index === 0}>
-              ← Previous
-            </button>
-            <span className="mono small">
-              Step {index + 1} of {steps.length}
-            </span>
-            <button
-              type="button"
-              className="primary"
-              onClick={() => {
-                if (!playingAll && index === steps.length - 1) setIndex(0);
-                setPlayingAll(!playingAll);
-              }}
-            >
-              {playingAll ? "Pause walkthrough" : index === 0 ? "▶ Play walkthrough" : "▶ Play from here"}
-            </button>
-            <button type="button" className="quiet" onClick={next} disabled={index === steps.length - 1}>
-              Next →
-            </button>
-          </div>
-
-          <article className="kt-caption">
-            <div className="wm-detail-head">
-              <h3>{step.title}</h3>
-              <ConfirmDelete
-                label="Delete step"
-                what="this step"
-                onConfirm={async () => {
-                  const updated = await deleteStep(map.id, step.id);
-                  setPlayingAll(false);
-                  setIndex((i) => Math.max(0, Math.min(i, updated.steps.length - 1)));
-                  setMap(updated);
+            <div className="kt-controls">
+              <button type="button" className="quiet" onClick={() => setIndex(Math.max(0, index - 1))} disabled={index === 0}>
+                ← Previous
+              </button>
+              <span className="mono small">
+                Step {index + 1} of {steps.length}
+              </span>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  if (!playingAll && index === steps.length - 1) setIndex(0);
+                  setPlayingAll(!playingAll);
                 }}
-              />
+              >
+                {playingAll ? "Pause walkthrough" : index === 0 ? "▶ Play walkthrough" : "▶ Play from here"}
+              </button>
+              <button type="button" className="quiet" onClick={next} disabled={index === steps.length - 1}>
+                Next →
+              </button>
             </div>
-            <p>{step.decision}</p>
-            <blockquote>
-              <q>{step.reason}</q>
-              <cite>
-                {map.expert}, {step.said_at === "quick ask" ? "Expert Minute" : `at ${step.said_at}`}
-              </cite>
-            </blockquote>
-            {step.guardrails.length > 0 && (
-              <div className="wm-grs">
-                {step.guardrails.map((gid) => (
-                  <mark key={gid} className="gr">
-                    {guardrail(gid)?.text ?? gid}
-                  </mark>
-                ))}
+
+            <article className="kt-caption">
+              <div className="wm-detail-head">
+                <h3>{step.title}</h3>
+                <ConfirmDelete
+                  label="Delete step"
+                  what="this step"
+                  onConfirm={async () => {
+                    const updated = await deleteStep(map.id, step.id);
+                    setPlayingAll(false);
+                    setIndex((i) => Math.max(0, Math.min(i, updated.steps.length - 1)));
+                    setMap(updated);
+                  }}
+                />
               </div>
-            )}
-          </article>
-        </section>
+              <p>{step.decision}</p>
+              <blockquote>
+                <q>{step.reason}</q>
+                <cite>
+                  {step.said_by ?? map.expert}, {step.said_at === "quick ask" ? "Expert Minute" : `at ${step.said_at}`}
+                </cite>
+              </blockquote>
+              {step.guardrails.length > 0 && (
+                <div className="wm-grs">
+                  {step.guardrails.map((gid) => (
+                    <mark key={gid} className="gr">
+                      {guardrail(gid)?.text ?? gid}
+                    </mark>
+                  ))}
+                </div>
+              )}
+            </article>
+          </section>
+        ) : (
+          <p className="muted">This task has no steps yet.</p>
+        )}
 
         <aside className="kt-side">
           <ol className="kt-chapters">
@@ -326,7 +341,7 @@ export function KnowledgeTask({ id }: { id: string }) {
             <b>Something not covered?</b>
             <span className="muted small">
               {open.length > 0
-                ? `${open.length} question${open.length > 1 ? "s" : ""} about this task are with the experts.`
+                ? `${open.length} question${open.length > 1 ? "s" : ""} about this task ${open.length > 1 ? "are" : "is"} with the experts.`
                 : "Ask the experts. Your question is routed to whoever knows best."}
             </span>
             <a className="btn" href="#/learner/minute">

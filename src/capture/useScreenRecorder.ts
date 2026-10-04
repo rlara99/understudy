@@ -4,6 +4,8 @@
 // startRef to the value start() returns, so every event's t lines up with the video.
 //
 // Off the record: setOffRecord(true) pauses the recorder, so that footage is never recorded.
+// It works from start() to stop(), also when no screen is shared, and a share that ends (the
+// browser's "Stop sharing") keeps the session off the record: only stop() goes back on.
 // The ERP's "Off the record" button asks for it over the capture channel, so the panel
 // doesn't have to wire anything up; it only reads `offRecord` (to drop transcript lines)
 // and offRecordSpans() (for SessionLog.off_record).
@@ -27,20 +29,23 @@ export function useScreenRecorder() {
   const stopped = useRef<Promise<Blob | null> | null>(null);
   const cuts = useRef<Cut[]>([]);
   const off = useRef(false);
+  /** A session is running (start() until stop()), with or without a screen recording. */
+  const active = useRef(false);
 
-  const broadcast = () =>
-    postControl({ kind: "state", recording: recorder.current?.state !== undefined && recorder.current.state !== "inactive", offRecord: off.current });
+  // `recording` on the channel means a session is running, so the ERP keeps its button even without a video.
+  const broadcast = () => postControl({ kind: "state", recording: active.current, offRecord: off.current });
 
-  /** Go off the record (pause recording) or back on. No-op when nothing is recording. */
+  /** Go off the record (pause recording, if there is one) or back on. No-op outside a session. */
   function setOffRecord(on: boolean) {
+    if (!active.current || on === off.current) return;
     const rec = recorder.current;
-    if (!rec || rec.state === "inactive" || on === off.current) return;
+    const rolling = rec !== null && rec.state !== "inactive";
     const t = Date.now() - startedAt.current;
     if (on) {
-      rec.pause();
+      if (rolling) rec.pause();
       cuts.current.push({ from: t, to: t });
     } else {
-      rec.resume();
+      if (rolling) rec.resume();
       cuts.current[cuts.current.length - 1].to = t;
     }
     off.current = on;
@@ -65,23 +70,30 @@ export function useScreenRecorder() {
   /**
    * Ask the user which screen or tab to share and start recording.
    * Call it straight from a click handler (browsers require a user gesture).
-   * Returns the start time (Date.now()), or null if the user cancelled.
+   * Returns the start time (Date.now()), or null if the user cancelled (the session still runs, without a video).
    */
   async function start(id: string): Promise<number | null> {
     setError(null);
+    let shared: MediaStream | null = null;
     try {
-      stream.current = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
+      shared = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
     } catch (err) {
       setError((err as Error).name === "NotAllowedError" ? "Screen sharing was cancelled." : String(err));
-      return null;
     }
     sessionId.current = id;
     chunks.current = [];
-    cuts.current = [];
-    off.current = false;
-    setOffRecordState(false);
+    // Already off the record stays off: only stop() goes back on.
+    cuts.current = off.current ? [{ from: 0, to: 0 }] : [];
+    active.current = true;
+    if (!shared) {
+      // Same clock as the panel's own Date.now() zero, so off-record spans still line up.
+      startedAt.current = Date.now();
+      broadcast();
+      return null;
+    }
+    stream.current = shared;
     const mimeType = MIME_TYPES.find((m) => MediaRecorder.isTypeSupported(m));
-    const rec = new MediaRecorder(stream.current, mimeType ? { mimeType } : undefined);
+    const rec = new MediaRecorder(shared, mimeType ? { mimeType } : undefined);
     rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
     stopped.current = new Promise((resolve) => {
       rec.onstop = async () => {
@@ -98,10 +110,14 @@ export function useScreenRecorder() {
         resolve(blob);
       };
     });
-    // The browser's own "Stop sharing" button ends the recording too.
-    stream.current.getVideoTracks()[0].addEventListener("ended", () => stop());
+    // The browser's own "Stop sharing" button ends the video (it is kept). The session and off the record go on.
+    shared.getVideoTracks()[0].addEventListener("ended", () => {
+      if (rec.state !== "inactive") rec.stop();
+      setRecording(false);
+    });
 
     rec.start(1000);
+    if (off.current) rec.pause();
     recorder.current = rec;
     startedAt.current = Date.now();
 
@@ -114,18 +130,18 @@ export function useScreenRecorder() {
     return startedAt.current;
   }
 
-  /** Stop sharing. Resolves with the recording once it is stored (null if nothing was recording). */
+  /** End the session: stop sharing, back on the record. Resolves with the recording once it is stored (null if nothing was recording). */
   function stop(): Promise<Blob | null> {
+    // Close an open off-the-record span (before rec.stop(): the stored recording reads the cuts).
+    if (off.current) cuts.current[cuts.current.length - 1].to = Date.now() - startedAt.current;
     const rec = recorder.current;
-    if (rec && rec.state !== "inactive") {
-      if (off.current) cuts.current[cuts.current.length - 1].to = Date.now() - startedAt.current;
-      rec.stop();
-    }
+    if (rec && rec.state !== "inactive") rec.stop();
     stream.current?.getTracks().forEach((t) => t.stop());
+    active.current = false;
     off.current = false;
     setOffRecordState(false);
     setRecording(false);
-    postControl({ kind: "state", recording: false, offRecord: false });
+    broadcast();
     return stopped.current ?? Promise.resolve(null);
   }
 
@@ -144,8 +160,9 @@ export function useScreenRecorder() {
   /** ms since the recording started; matches the panel's event times when startRef = startedAt. */
   const elapsed = () => (startedAt.current ? Date.now() - startedAt.current : 0);
 
-  /** Spans taken off the record so far, in ms since start. Matches SessionLog.off_record. */
-  const offRecordSpans = (): Cut[] => cuts.current.map((c) => ({ ...c }));
+  /** Spans taken off the record so far, in ms since start (an open one ends now). Matches SessionLog.off_record. */
+  const offRecordSpans = (): Cut[] =>
+    cuts.current.map((c, i) => (off.current && i === cuts.current.length - 1 ? { ...c, to: Date.now() - startedAt.current } : { ...c }));
 
   return {
     recording,

@@ -14,7 +14,8 @@ type Listed = OpenQuestion & { map_id: string; workflow: string };
 
 /** Withdraw my question: delete it if I'm the only one who asked, otherwise just take my vote off. */
 async function withdraw(q: Listed) {
-  if (q.asked_by_count <= 1) {
+  // Counts from before repeat asks stopped adding votes can be over 1 with only me asking: nobody else would own it.
+  if (q.asked_by_count <= 1 || (q.askers ?? []).every((a) => a === LEARNER)) {
     await deleteQuestion(q.map_id, q.id);
     return;
   }
@@ -31,6 +32,8 @@ interface Posted {
   map_id: string;
   workflow: string;
   merged: boolean;
+  /** This learner had already asked it: no new vote. */
+  already_asked?: boolean;
 }
 
 export function LearnerMinute() {
@@ -126,9 +129,11 @@ export function LearnerMinute() {
           </button>
           {sent && (
             <span className="lm-sent">
-              {sent.merged
-                ? `Someone already asked this. Added your vote; it's with ${sent.question.route_to ?? "the experts"}`
-                : `Sent to ${sent.question.route_to ?? "the experts"} · the answer will show up below`}
+              {sent.already_asked
+                ? `You already asked this. It's still with ${sent.question.route_to ?? "the experts"}`
+                : sent.merged
+                  ? `Someone already asked this. Added your vote; it's with ${sent.question.route_to ?? "the experts"}`
+                  : `Sent to ${sent.question.route_to ?? "the experts"} · the answer will show up below`}
             </span>
           )}
           {error && <span className="err small">{error}</span>}

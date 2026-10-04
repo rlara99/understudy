@@ -74,12 +74,23 @@ function Panel() {
   /** Transcript length when the Quick Ask started; the expert's lines after it are the answer. */
   const quickAskFrom = useRef(0);
 
-  // Opened from the Expert Minute inbox: pick up the handed-over question.
+  // Opened from the Expert Minute inbox: pick up the handed-over question. The desktop companion is reused
+  // (same route, no reload) for the next "Answer by voice", so look again whenever the window gets focus.
+  // Never while a Quick Ask is connected or saving: the new question waits in storage until then.
   useEffect(() => {
-    const qa = takePendingQuickAsk();
-    if (!qa) return;
-    setQuickAsk(qa);
-    setPhase("quickask");
+    const pickUp = (first: boolean) => {
+      if (!first && (conv.current.status === "connected" || phaseRef.current === "patching")) return;
+      const qa = takePendingQuickAsk();
+      if (!qa) return;
+      setError(null);
+      setQuickAsk(qa);
+      setPhase("quickask");
+      phaseRef.current = "quickask";
+    };
+    pickUp(true);
+    const onFocus = () => pickUp(false);
+    addEventListener("focus", onFocus);
+    return () => removeEventListener("focus", onFocus);
   }, []);
 
   const screen = useScreenRecorder();

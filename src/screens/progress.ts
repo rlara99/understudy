@@ -16,10 +16,12 @@ const ERP_KEY = "understudy.erp.progress";
 const VIEW_KEY = "understudy.progress.view";
 
 export interface InvoiceProgress {
-  /** Guardrail ids that blocked a save of this invoice. */
+  /** Guardrails that blocked a save of this invoice, as "<map id>:<guardrail id>" (ids are only unique within a map). */
   blocked: string[];
   /** The invoice as it was finally saved. */
   saved?: Invoice;
+  /** The Work Map the ERP enforced when it was saved. */
+  map?: string;
 }
 export type Progress = Record<string, InvoiceProgress>;
 
@@ -50,16 +52,18 @@ function erpUpdate(fn: (p: Progress) => void) {
   publish(CHANNEL, { kind: "state", progress: p } satisfies ProgressMsg);
 }
 
-export function recordBlocked(invoice: string, guardrailIds: string[]) {
+const ruleKey = (mapId: string, guardrailId: string) => `${mapId}:${guardrailId}`;
+
+export function recordBlocked(invoice: string, mapId: string, guardrailIds: string[]) {
   erpUpdate((p) => {
     const cur = p[invoice] ?? { blocked: [] };
-    p[invoice] = { ...cur, blocked: [...new Set([...cur.blocked, ...guardrailIds])] };
+    p[invoice] = { ...cur, blocked: [...new Set([...cur.blocked, ...guardrailIds.map((g) => ruleKey(mapId, g))])] };
   });
 }
 
-export function recordSaved(invoice: Invoice) {
+export function recordSaved(invoice: Invoice, mapId: string | undefined) {
   erpUpdate((p) => {
-    p[invoice.id] = { blocked: p[invoice.id]?.blocked ?? [], saved: invoice };
+    p[invoice.id] = { blocked: p[invoice.id]?.blocked ?? [], saved: invoice, map: mapId };
   });
 }
 
@@ -128,18 +132,19 @@ export interface Mastery {
 /**
  * A step is "practice" if any of its guardrails ever blocked a save (the tutor had to step in),
  * "mastered" if a saved invoice fell under one of its guardrails and nothing was blocked,
- * and "not_seen" otherwise.
+ * and "not_seen" otherwise. Only blocks and saves made while the ERP enforced this map count.
  */
 export function computeMastery(map: WorkMap, progress: Progress): Mastery {
   const steps = map.steps.map((step) => {
     const checks = map.guardrails.filter((g) => step.guardrails.includes(g.id) && g.check);
+    const rules = new Set(step.guardrails.map((gid) => ruleKey(map.id, gid)));
     let status: StepStatus = "not_seen";
     const invoices: string[] = [];
     for (const [id, p] of Object.entries(progress)) {
-      if (p.blocked.some((b) => step.guardrails.includes(b))) {
+      if (p.blocked.some((b) => rules.has(b))) {
         status = "practice";
         invoices.push(id);
-      } else if (p.saved && checks.some((g) => applies(p.saved!, g))) {
+      } else if (p.saved && p.map === map.id && checks.some((g) => applies(p.saved!, g))) {
         if (status === "not_seen") status = "mastered";
         invoices.push(id);
       }

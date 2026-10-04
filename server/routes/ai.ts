@@ -2,9 +2,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import type { Expert, OpenQuestion, SessionLog, TranscriptLine, WorkMap } from "../../src/shared/types";
+import { holds } from "../../src/shared/guardrails";
+import { pickMap } from "../../src/shared/pickMap";
+import type { Expert, GuardrailCheck, Invoice, OpenQuestion, SessionLog, TranscriptLine, WorkMap } from "../../src/shared/types";
 import { client, MODELS, askJson } from "../claude";
-import { listJson, readJson, safeId, writeJson } from "../store";
+import { listJson, readJson, safeId, updateJson, writeJson } from "../store";
 
 export const aiRoutes = Router();
 
@@ -150,7 +152,10 @@ aiRoutes.post("/map", async (req, res) => {
     return;
   }
   const logs = await Promise.all(ids.map((id) => readJson<SessionLog>(`sessions/${id}.json`)));
-  const id = safeId(body.mapId ?? (ids.length === 1 ? ids[0] : `map-${Date.now()}`));
+  let id = safeId(body.mapId ?? (ids.length === 1 ? ids[0] : `map-${Date.now()}`));
+  // A new draft never overwrites a confirmed map (e.g. Prepare debrief again on a reviewed session): it gets its own id.
+  const existing = await readJson<WorkMap>(`workmaps/${id}.json`).catch(() => null);
+  if (!body.confirm && existing?.confirmed) id = `map-${Date.now()}`;
   const debriefNote = body.confirm
     ? body.debrief
       ? `
@@ -185,23 +190,24 @@ List as "gaps" the questions a new hire would still need answered: missing reaso
       ...(body.debrief ? { debrief: body.debrief } : {}),
     }),
   });
-  // Keep open questions if this map already existed (e.g. confirming a draft).
-  let previous: WorkMap | null = null;
-  try {
-    previous = await readJson<WorkMap>(`workmaps/${id}.json`);
-  } catch {
-    previous = null;
-  }
+  // Keep open questions if this map already existed (e.g. confirming a draft). Read now, so one flagged meanwhile stays.
+  const previous = await readJson<WorkMap>(`workmaps/${id}.json`).catch(() => null);
+  const now = new Date().toISOString();
   const map: WorkMap = {
     id,
     workflow: body.workflow ?? result.workflow_title,
     expert: body.expert,
     team: body.team,
     confirmed: Boolean(body.confirm),
-    steps: result.steps.map((s) => ({ ...s, moment: { ...s.moment, session: s.moment.session ?? ids[0] } })),
+    // A session id the model got wrong or made up would play no footage: use the first session instead.
+    steps: result.steps.map((s) => ({
+      ...s,
+      moment: { ...s.moment, session: s.moment.session && ids.includes(s.moment.session) ? s.moment.session : ids[0] },
+    })),
     guardrails: result.guardrails as WorkMap["guardrails"],
     open_questions: previous?.open_questions ?? [],
-    updated_at: new Date().toISOString(),
+    updated_at: now,
+    ...(body.confirm ? { confirmed_at: now } : {}),
     sources: ids,
   };
   await writeJson(`workmaps/${map.id}.json`, map);
@@ -239,11 +245,10 @@ aiRoutes.post("/route", async (req, res) => {
   res.json(await routeQuestion(question, context, open ?? []));
 });
 
-/** Map that new questions go to: the given one, else the newest confirmed real map, else the newest map. */
+/** Map that new questions go to: the given one, else the one the Assistant and the ERP teach from (`pickMap`). */
 async function targetMap(mapId?: string): Promise<WorkMap | null> {
   if (mapId) return readJson<WorkMap>(`workmaps/${safeId(mapId)}.json`);
-  const maps = (await listJson<WorkMap>("workmaps")).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  return maps.find((m) => !m.sample && m.confirmed) ?? maps.find((m) => !m.sample) ?? maps[0] ?? null;
+  return pickMap(await listJson<WorkMap>("workmaps"));
 }
 
 // ---------- POST /api/questions  { question, context?, asker?, mapId? } ----------
@@ -266,28 +271,38 @@ aiRoutes.post("/questions", async (req, res) => {
   }
   const open = map.open_questions.filter((q) => q.status === "open");
   const routed = await routeQuestion(question, context, open.map((q) => ({ id: q.id, q: q.q })));
-  let q = open.find((x) => x.id === routed.duplicate_of);
-  const merged = Boolean(q);
-  if (q) {
-    q.asked_by_count += 1;
-    if (asker && !q.askers?.includes(asker)) q.askers = [...(q.askers ?? []), asker];
-  } else {
-    q = {
-      id: `q-${Date.now()}`,
-      q: routed.neutral_question,
-      context,
-      asked_by_count: 1,
-      route_to: routed.expert_name,
-      route_reason: routed.reason,
-      status: "open",
-      askers: asker ? [asker] : [],
-      asked_at: new Date().toISOString(),
-    } satisfies OpenQuestion;
-    map.open_questions.push(q);
-  }
-  map.updated_at = new Date().toISOString();
-  await writeJson(`workmaps/${map.id}.json`, map);
-  res.json({ question: q, map_id: map.id, workflow: map.workflow, merged });
+  // Re-read inside the lock: the map may have changed during the routing call.
+  let q: OpenQuestion | undefined;
+  let merged = false;
+  let alreadyAsked = false;
+  const updated = await updateJson<WorkMap>(`workmaps/${map.id}.json`, (current) => {
+    q = current.open_questions.find((x) => x.status === "open" && x.id === routed.duplicate_of);
+    merged = Boolean(q);
+    if (q) {
+      // The same learner asking again adds no vote.
+      alreadyAsked = Boolean(asker && q.askers?.includes(asker));
+      if (!alreadyAsked) {
+        q.asked_by_count += 1;
+        if (asker) q.askers = [...(q.askers ?? []), asker];
+      }
+    } else {
+      q = {
+        id: `q-${Date.now()}`,
+        q: routed.neutral_question,
+        context,
+        asked_by_count: 1,
+        route_to: routed.expert_name,
+        route_reason: routed.reason,
+        status: "open",
+        askers: asker ? [asker] : [],
+        asked_at: new Date().toISOString(),
+      } satisfies OpenQuestion;
+      current.open_questions.push(q);
+    }
+    current.updated_at = new Date().toISOString();
+    return current;
+  });
+  res.json({ question: q, map_id: map.id, workflow: updated?.workflow ?? map.workflow, merged, already_asked: alreadyAsked });
 });
 
 // ---------- GET /api/questions?asker=Name ----------
@@ -304,6 +319,25 @@ aiRoutes.get("/questions", async (req, res) => {
   res.json(all);
 });
 
+/** Fields a new hire can change in the ERP before saving (with their only values, for selects). */
+const EDITABLE: Record<string, string[] | null> = {
+  cost_center: null,
+  asset_no: null,
+  note: null,
+  approval: ["single", "second"],
+  status: ["open", "held", "posted", "pending_approval"],
+};
+
+/** Could some save meet this check? One no save can meet (e.g. "convert to EUR", a field the ERP doesn't have) blocks every matching invoice for good. */
+function meetable(check: GuardrailCheck): boolean {
+  const { field } = check.require;
+  if (!(field in EDITABLE)) return false;
+  const own = check.when.filter((c) => c.field === field);
+  const values = EDITABLE[field] ?? own.filter((c) => c.op === "eq").map((c) => String(c.value));
+  if (values.length === 0) return true; // free text: some value will do
+  return values.some((v) => [...own, check.require].every((c) => holds({ [field]: v } as unknown as Invoice, c)));
+}
+
 // ---------- POST /api/patch  { workmapId, questionId, answer, expert } ----------
 aiRoutes.post("/patch", async (req, res) => {
   const { workmapId, questionId, answer, expert } = req.body as {
@@ -318,19 +352,59 @@ aiRoutes.post("/patch", async (req, res) => {
     res.status(404).json({ error: `Question ${questionId} not found` });
     return;
   }
+  if (question.status !== "open") {
+    res.status(409).json({ error: "This question was already answered" });
+    return;
+  }
   const result = await askJson({
     schema: z.object({ answer_clean: z.string(), step: Step, guardrails: z.array(Guardrail) }),
     system: `An expert answered an open question about a workflow by voice. The answer may be a speech-to-text transcript with mistakes and filler, and may include the agent's repeat-back that the expert confirmed; trust the confirmed repeat-back where the transcript is garbled.
 answer_clean: the expert's answer in one or two clear sentences, in their voice ("Convert at ...").
 Then turn it into one new Work Map step and any guardrails it implies, using the expert's words. Use moment {t:"00:00", clip_s:0} and said_at "quick ask". New ids must not clash with existing ones. Guardrail text: one plain rule under 15 words, written for a new hire. Never mention checks, fields, data or the system in it. Add a machine check when possible. Invoice fields for checks: ${INVOICE_FIELDS}.`,
-    user: JSON.stringify({ question: question.q, context: question.context, answer, expert, existing: map }),
+    // Only what the step needs: open questions carry the askers' names, which must not end up in the step text.
+    user: JSON.stringify({
+      question: question.q,
+      context: question.context,
+      answer,
+      expert,
+      existing: { workflow: map.workflow, steps: map.steps, guardrails: map.guardrails },
+    }),
   });
-  map.steps.push(result.step);
-  map.guardrails.push(...(result.guardrails as WorkMap["guardrails"]));
-  question.status = "answered";
-  question.answer = result.answer_clean;
-  question.answered_at = new Date().toISOString();
-  map.updated_at = new Date().toISOString();
-  await writeJson(`workmaps/${map.id}.json`, map);
-  res.json(map);
+  // Don't trust the model on the shape: fresh ids, no footage, credited to who answered, every new guardrail on the step.
+  const stamp = Date.now();
+  const guardrails = (result.guardrails as WorkMap["guardrails"]).map((g, i) => ({
+    ...g,
+    id: `g-${stamp}-${i + 1}`,
+    check: g.check && meetable(g.check) ? g.check : undefined,
+  }));
+  const newIds = new Set(result.guardrails.map((g) => g.id));
+  let conflict = false;
+  const updated = await updateJson<WorkMap>(`workmaps/${map.id}.json`, (current) => {
+    // Answered (e.g. by text in another window) or deleted while Claude was writing the step.
+    const q = current.open_questions.find((x) => x.id === questionId);
+    if (!q || q.status !== "open") {
+      conflict = true;
+      return null;
+    }
+    const kept = result.step.guardrails.filter((gid) => !newIds.has(gid) && current.guardrails.some((g) => g.id === gid));
+    current.steps.push({
+      ...result.step,
+      id: `s-${stamp}`,
+      moment: { t: "00:00", clip_s: 0 },
+      said_at: "quick ask",
+      said_by: expert,
+      guardrails: [...kept, ...guardrails.map((g) => g.id)],
+    });
+    current.guardrails.push(...guardrails);
+    q.status = "answered";
+    q.answer = result.answer_clean;
+    q.answered_at = new Date().toISOString();
+    current.updated_at = new Date().toISOString();
+    return current;
+  });
+  if (conflict || !updated) {
+    res.status(409).json({ error: "This question was answered or deleted in the meantime" });
+    return;
+  }
+  res.json(updated);
 });

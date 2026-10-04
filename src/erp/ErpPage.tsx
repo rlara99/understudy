@@ -8,6 +8,7 @@ import { onControl, postControl } from "../capture/control";
 import { getJson } from "../shared/api";
 import { publishErpEvent } from "../shared/bus";
 import { violatedGuardrails } from "../shared/guardrails";
+import { pickMap } from "../shared/pickMap";
 import type { ErpEvent, Guardrail, Invoice, WorkMap } from "../shared/types";
 import { clearErpProgress, recordBlocked, recordSaved, serveProgress } from "../screens/progress";
 import "./erp.css";
@@ -66,12 +67,6 @@ function resetErp() {
   } catch {
     /* nothing stored */
   }
-}
-
-/** Newest confirmed real map wins; the hand-made sample is the fallback. */
-function pickMap(maps: WorkMap[]): WorkMap | null {
-  const byDate = [...maps].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  return byDate.find((m) => !m.sample && m.confirmed) ?? byDate.find((m) => !m.sample) ?? byDate[0] ?? null;
 }
 
 const money = (amount: number, currency: string) =>
@@ -193,13 +188,13 @@ export function ErpPage({ mode, onSwitchUser }: { mode: Mode; onSwitchUser: (mod
     const broken = mode === "teach" && map ? violatedGuardrails(target, map.guardrails) : [];
     if (broken.length) {
       broken.forEach((g) => publish({ type: "guardrail_blocked", invoice: draft.id, field: g.id, note: g.text }));
-      recordBlocked(draft.id, broken.map((g) => g.id));
+      recordBlocked(draft.id, map!.id, broken.map((g) => g.id));
       setBlocked(broken);
       return;
     }
 
     publish({ type: "save", invoice: draft.id, field: "status", from: before.status, to: target.status });
-    if (mode === "teach") recordSaved(target);
+    if (mode === "teach") recordSaved(target, map?.id);
     const next = invoices.map((i) => (i.id === target.id ? target : i));
     setInvoices(next);
     writeEdits(mode, next);
@@ -294,7 +289,8 @@ export function ErpPage({ mode, onSwitchUser }: { mode: Mode; onSwitchUser: (mod
                 <dt>Country</dt>
                 <dd>{draft.country}</dd>
                 <dt>Invoice date</dt>
-                <dd>{new Date(draft.date).toLocaleDateString("de-DE")}</dd>
+                {/* A date-only ISO string parses as UTC midnight: format in UTC or US time zones show the day before. */}
+                <dd>{new Date(draft.date).toLocaleDateString("de-DE", { timeZone: "UTC" })}</dd>
                 <dt>Description</dt>
                 <dd>{draft.description}</dd>
                 <dt>Amount</dt>

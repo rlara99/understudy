@@ -7,7 +7,7 @@
     "dev": "concurrently -k -n web,api -c blue,green \"vite\" \"tsx watch server/index.ts\"",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
-    "desktop": "concurrently -k -n web,api,app -c blue,green,magenta \"vite\" \"tsx watch server/index.ts\" \"wait-on http-get://localhost:5173 tcp:8787 && electron .\"",
+    "desktop": "concurrently -k -n web,api,app -c blue,green,magenta \"vite\" \"tsx watch server/index.ts\" \"wait-on http-get://localhost:5173 tcp:127.0.0.1:8787 && electron .\"",
     "desktop:app": "electron ."
   },
   "dependencies": {

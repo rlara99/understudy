@@ -9,6 +9,7 @@ import { AGENT_NAME, TUTOR_PROMPT, greeting } from "../agents/prompts";
 import { ClipPlayer } from "../capture/ClipPlayer";
 import { getJson, postJson } from "../shared/api";
 import { formatMs, onErpEvent } from "../shared/bus";
+import { pickMap } from "../shared/pickMap";
 import type { Invoice, OpenQuestion, Step, WorkMap } from "../shared/types";
 import { useScreenWatch, type FrameResult } from "./useScreenWatch";
 import { useMicHold } from "./useMicHold";
@@ -20,12 +21,6 @@ export const LEARNER = "Lena";
 
 /** "Sabrina never showed me this" and similar. */
 const GAP_RE = /(never|didn'?t|did not|hasn'?t|has not)\s+(show|shown|showed|teach|taught|tell|told|explain|explained)/i;
-
-/** Newest confirmed real map wins; the hand-made sample is the fallback. (Same rule as the ERP.) */
-function pickMap(maps: WorkMap[]): WorkMap | null {
-  const byDate = [...maps].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  return byDate.find((m) => !m.sample && m.confirmed) ?? byDate.find((m) => !m.sample) ?? byDate[0] ?? null;
-}
 
 const money = (amount: number, currency: string) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(amount);
@@ -133,6 +128,10 @@ function Tutor() {
       note(`work map sent: ${m.workflow}`);
     },
     onDisconnect: (d) => note(`disconnected: ${JSON.stringify(d).slice(0, 120)}`),
+    // However the session ends (Stop, the agent hanging up, a dropped connection), stop sending frames to /api/frame.
+    onStatusChange: ({ status }) => {
+      if (status === "disconnected") watch.stop();
+    },
     onError: (message) => note(`error: ${String(message)}`),
     onMessage: ({ message, role }) => {
       setTranscript((t) => [...t, { t: Date.now() - t0.current, who: role === "agent" ? "tutor" : "new hire", text: message }]);
@@ -162,6 +161,8 @@ function Tutor() {
       const live = conv.current.status === "connected";
       if (e.type === "invoice_opened") {
         currentInvoice.current = e.invoice;
+        // What the learner said about the previous invoice is not a question about this one.
+        lastLearnerText.current = null;
         setClipStep(null);
         const inv = invoicesRef.current.find((i) => i.id === e.invoice);
         if (live && inv) say(`[OPENED] ${describeInvoice(inv)}`);
@@ -189,11 +190,16 @@ function Tutor() {
             const s = stepForGuardrail(id);
             return `rule "${g?.text ?? id}"${g?.quote ? `, ${EXPERT_FIRST_NAME}'s words: "${g.quote}"` : ""}${s ? `, her reason: "${s.reason}"` : ""}`;
           });
+          // A Quick Ask step has no footage, so there is no clip to point at.
+          const clip = blockedBatch.some((id) => {
+            const s = stepForGuardrail(id);
+            return s && s.said_at !== "quick ask";
+          });
           blockedBatch = [];
           note(`blocked: ${lines.join(" | ").slice(0, 120)}`);
           if (conv.current.status === "connected")
             say(
-              `[BLOCKED] The new hire tried to save ${e.invoice}, but it breaks ${lines.join("; ")}. ${EXPERT_FIRST_NAME}'s clip is already playing on screen.`,
+              `[BLOCKED] The new hire tried to save ${e.invoice}, but it breaks ${lines.join("; ")}.${clip ? ` ${EXPERT_FIRST_NAME}'s clip is already playing on screen.` : ""}`,
             );
         }, 250);
       }
@@ -311,12 +317,25 @@ function Tutor() {
 
       {clipStep && map && (
         <section>
-          <h3>
-            {EXPERT_FIRST_NAME} at {clipStep.moment.t}: {clipStep.title}
-          </h3>
-          <ClipPlayer key={clipStep.id} at={clipStep.moment.clip_s} sessionId={map.sample ? undefined : map.id} />
+          {/* A Quick Ask answer was spoken, not shown: no footage to play. */}
+          {clipStep.said_at === "quick ask" ? (
+            <h3>
+              {clipStep.said_by ?? map.expert} in a Quick Ask: {clipStep.title}
+            </h3>
+          ) : (
+            <>
+              <h3>
+                {EXPERT_FIRST_NAME} at {clipStep.moment.t}: {clipStep.title}
+              </h3>
+              <ClipPlayer
+                key={clipStep.id}
+                at={clipStep.moment.clip_s}
+                sessionId={clipStep.moment.session ?? (map.sample ? undefined : map.id)}
+              />
+            </>
+          )}
           <p>
-            <q>{clipStep.reason}</q> <span className="muted">{map.expert}</span>
+            <q>{clipStep.reason}</q> <span className="muted">{clipStep.said_by ?? map.expert}</span>
           </p>
         </section>
       )}

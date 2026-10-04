@@ -12,7 +12,10 @@ interface Props {
   leadIn?: number;
   /** Stop this many seconds after the moment. The clip never runs longer than 30 s. */
   after?: number;
+  /** Play once the clip is loaded. Read only then: changing it later doesn't restart the clip. */
   autoPlay?: boolean;
+  /** Pause (false) or play (true) the loaded clip when this changes; playing an ended clip replays it. */
+  playing?: boolean;
   /** Called when the clip reaches its end while playing (used to chain clips into a walkthrough). */
   onClipEnd?: () => void;
   /** Called with false when there is nothing to play: no recording, or the moment is past its end. */
@@ -21,8 +24,10 @@ interface Props {
 
 const MAX_CLIP_S = 30;
 
-export function ClipPlayer({ at, sessionId, leadIn = 3, after = 10, autoPlay = true, onClipEnd, onAvailable }: Props) {
+export function ClipPlayer({ at, sessionId, leadIn = 3, after = 10, autoPlay = true, playing, onClipEnd, onAvailable }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
+  const autoPlayRef = useRef(autoPlay);
+  autoPlayRef.current = autoPlay;
   const onClipEndRef = useRef(onClipEnd);
   onClipEndRef.current = onClipEnd;
   const onAvailableRef = useRef(onAvailable);
@@ -34,16 +39,15 @@ export function ClipPlayer({ at, sessionId, leadIn = 3, after = 10, autoPlay = t
 
   useEffect(() => {
     let objectUrl: string | null = null;
-    // Fall back to the newest recording, e.g. for the hand-made sample map.
-    loadRecording(sessionId)
-      .then((rec) => rec ?? (sessionId ? loadRecording() : null))
-      .then((rec) => {
-        onAvailableRef.current?.(Boolean(rec));
-        if (!rec) return setMissing(true);
-        objectUrl = URL.createObjectURL(rec.blob);
-        setCuts(rec.cuts);
-        setUrl(objectUrl);
-      });
+    // No id (the hand-made sample map) means the newest recording. A session whose own recording is gone
+    // shows "no recording" rather than another session's footage.
+    loadRecording(sessionId).then((rec) => {
+      onAvailableRef.current?.(Boolean(rec));
+      if (!rec) return setMissing(true);
+      objectUrl = URL.createObjectURL(rec.blob);
+      setCuts(rec.cuts);
+      setUrl(objectUrl);
+    });
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
@@ -92,7 +96,7 @@ export function ClipPlayer({ at, sessionId, leadIn = 3, after = 10, autoPlay = t
       onAvailableRef.current?.(!missingMoment);
       if (missingMoment) return;
       v.currentTime = target;
-      if (autoPlay) v.play().catch(() => {});
+      if (autoPlayRef.current) v.play().catch(() => {});
     };
     // MediaRecorder files have no duration, which breaks seeking. Jumping far
     // past the end makes the browser scan the file and learn the real duration.
@@ -119,7 +123,15 @@ export function ClipPlayer({ at, sessionId, leadIn = 3, after = 10, autoPlay = t
       v.removeEventListener("playing", onPlaying);
       v.removeEventListener("ended", finish);
     };
-  }, [url, cuts, at, leadIn, after, autoPlay]);
+  }, [url, cuts, at, leadIn, after]);
+
+  // Play / pause on request (the walkthrough's buttons). Until the clip is ready, autoPlay decides.
+  useEffect(() => {
+    const v = ref.current;
+    if (playing === undefined || !v || !url || outOfRange || !Number.isFinite(v.duration)) return;
+    if (playing) v.play().catch(() => {});
+    else v.pause();
+  }, [playing]);
 
   if (missing) return <p className="muted">No screen recording yet. Record a capture session first.</p>;
   return (

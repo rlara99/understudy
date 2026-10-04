@@ -14,9 +14,11 @@ import "./screens.css";
 type Item = OpenQuestion & { map: WorkMap; answer_clean?: string };
 
 export function InboxScreen() {
-  const [maps, setMaps] = useState<WorkMap[]>([]);
+  // null until the first load succeeds, so a slow or unreachable API never reads as "all answered".
+  const [maps, setMaps] = useState<WorkMap[] | null>(null);
   const [experts, setExperts] = useState<Expert[]>([]);
 
+  // On failure it stays as it was (Loading… or the last list); the 3 s poll recovers.
   const load = () => getJson<WorkMap[]>("/api/workmaps").then(setMaps).catch(() => {});
   useEffect(() => {
     load();
@@ -25,7 +27,7 @@ export function InboxScreen() {
     return () => clearInterval(id);
   }, []);
 
-  const all: Item[] = maps.flatMap((m) => m.open_questions.map((q) => ({ ...q, map: m })));
+  const all: Item[] = (maps ?? []).flatMap((m) => m.open_questions.map((q) => ({ ...q, map: m })));
   const open = all.filter((q) => q.status === "open").sort((a, b) => b.asked_by_count - a.asked_by_count);
   const answered = all.filter((q) => q.status === "answered");
   const expert = (n?: string) => experts.find((e) => e.name === n);
@@ -37,7 +39,9 @@ export function InboxScreen() {
         <p className="muted">Questions new hires hit that no task answers yet. About a minute each, by voice.</p>
       </header>
 
-      {open.length === 0 ? (
+      {maps === null ? (
+        <p className="muted">Loading…</p>
+      ) : open.length === 0 ? (
         <p className="muted">Nothing waiting. Every question so far has been answered.</p>
       ) : (
         <ul className="inbox-list">

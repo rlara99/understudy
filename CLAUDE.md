@@ -140,6 +140,9 @@ Claude via **MIT Parley** (Anthropic-compatible). `server/env.ts` loads `.env` w
 - Starting a terminal-panel tab from Claude can time out; start servers with Bash `run_in_background` (and stop them afterwards so Renzo's launcher can bind the ports).
 - **Electron binary missing after `npm install`** (`node_modules/electron/dist/electron.exe` absent): run `node node_modules/electron/install.js` once.
 - **Blank page / "Invalid hook call" / two React copies** after installing packages while pages are open: stop the app, delete `node_modules/.vite`, restart, fully reload every window.
+- **ClipPlayer** falls back to the newest recording only when no `sessionId` is passed (the sample map); a session whose recording is gone shows "no recording" instead of another session's footage. Steps with `said_at: "quick ask"` have no footage: the walkthrough shows a slide, the Work Map page a note. The walkthrough drives play/pause through `playing` (`autoPlay` is read only once the clip loads).
+- **Off the record** (`useScreenRecorder`) works from `start()` to `stop()` even when the screen share was cancelled, and the browser's "Stop sharing" keeps the session (and off the record) going; only `stop()` goes back on. On the `capture` channel `recording` now means "a session is running".
+- **Mastery is per map**: the ERP records blocks as `"<map id>:<guardrail id>"` and saves with the map it enforced; only those count for a map (old progress stops counting; Reset demo clears it).
 
 ## Rules
 

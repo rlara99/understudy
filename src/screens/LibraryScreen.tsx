@@ -73,7 +73,7 @@ export function LibraryScreen() {
                   {m.expert} · {m.team}
                 </span>
                 <span className="mono small">
-                  {m.steps.length} steps · {m.guardrails.length} guardrails
+                  {m.steps.length} step{m.steps.length === 1 ? "" : "s"} · {m.guardrails.length} guardrail{m.guardrails.length === 1 ? "" : "s"}
                 </span>
                 <span className="meter" aria-hidden="true">
                   <span style={{ width: `${mastery.score ?? 0}%` }} />

@@ -74,6 +74,8 @@ export interface Step {
   reason: string;
   /** "mm:ss" when the expert said it. */
   said_at: string;
+  /** Who said it, when not the map's expert (a Quick Ask answer from another expert). */
+  said_by?: string;
   guardrails: string[];
 }
 
@@ -128,6 +130,8 @@ export interface WorkMap {
   guardrails: Guardrail[];
   open_questions: OpenQuestion[];
   updated_at: string;
+  /** Set on Confirm. The Assistant and the ERP teach from the most recently confirmed map (renames, questions and deletes don't change it). */
+  confirmed_at?: string;
   /** true for the seeded example map. */
   sample?: boolean;
   /** Session ids the map was built from. */

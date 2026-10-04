@@ -21,6 +21,7 @@ export function useScreenWatch(onFrame: (r: FrameResult) => void, opts: { everyM
   paused.current = opts.paused;
 
   async function start() {
+    if (stream.current) return true; // already watching: a second capture would never be stopped
     setError(null);
     try {
       stream.current = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 5 }, audio: false });
