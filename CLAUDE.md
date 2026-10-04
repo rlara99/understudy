@@ -98,6 +98,8 @@ npm run typecheck
 
 Restart `npm run dev` after changing any `.env*` file. Only one copy can run (ports 5173/8787).
 
+**Without PowerShell (Windows):** run `powershell -ExecutionPolicy Bypass -File desktop\create-shortcuts.ps1` once. It puts two icons on the desktop: **Understudy** (`desktop/launch-desktop.vbs`: starts `npm run desktop` hidden, or just focuses the window if it's already running; closing the window stops everything; log in `%TEMP%\understudy.log`) and **Understudy (browser)** (`desktop/launch-browser.vbs`: starts `npm run dev` hidden if needed and opens http://localhost:5173; the server keeps running after the browser closes; log in `%TEMP%\understudy-web.log`). Icon: `desktop/understudy.ico`. A real installer (electron-builder, server bundled, data in the user folder) is a later step.
+
 ## Demo flow
 
 | Role | Windows | Steps |
