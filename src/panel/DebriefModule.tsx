@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { AGENT_NAME, DEBRIEF_FIRST_MESSAGE, INTERVIEWER_PROMPT } from "../agents/prompts";
 import { getJson, postJson } from "../shared/api";
 import { formatMs } from "../shared/bus";
+import { ConfirmDelete } from "../shared/ConfirmDelete";
+import { deleteSession } from "../shared/deletes";
 import type { SessionLog, TranscriptLine, WorkMap } from "../shared/types";
 import "./session.css";
 import { useMicHold } from "./useMicHold";
@@ -215,6 +217,20 @@ function Debrief() {
                     {g.parts.length > 1 ? ` · ${g.parts.length} parts` : ""} · {events} events · {lines} lines
                     {g.parts.every((p) => p.reviewed_in) ? " · already reviewed" : ""}
                   </span>
+                </span>
+                <span style={{ marginLeft: "auto" }}>
+                  <ConfirmDelete
+                    what={g.parts.length > 1 ? `all ${g.parts.length} parts and their recordings` : "this session and its recording"}
+                    onConfirm={async () => {
+                      try {
+                        await Promise.all(ids.map((id) => deleteSession(id)));
+                        setSessions((all) => (all ?? []).filter((s) => !ids.includes(s.id)));
+                        setSelected((sel) => sel.filter((id) => !ids.includes(id)));
+                      } catch (e) {
+                        setError(`Could not delete: ${String(e)}`);
+                      }
+                    }}
+                  />
                 </span>
               </label>
             );

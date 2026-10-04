@@ -79,3 +79,8 @@ export function toVideoSeconds(sessionS: number, cuts: Cut[]): number {
 export async function clearRecordings(): Promise<void> {
   await run("readwrite", (s) => s.clear());
 }
+
+/** Delete one session's recording (used when the session is deleted). Added by Renzo for deletes. */
+export async function deleteRecording(id: string): Promise<void> {
+  await run("readwrite", (s) => s.delete(id));
+}

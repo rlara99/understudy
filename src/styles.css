@@ -153,3 +153,8 @@ main { padding: var(--page-pad); }
 @media (max-width: 700px) {
   :root { --page-pad: 16px; }
 }
+/* Two-click delete (src/shared/ConfirmDelete.tsx) */
+.confirm-delete { font-size: 0.85em; padding: 4px 10px; color: #b42318; background: transparent; border: 1px solid transparent; border-radius: 6px; }
+.confirm-delete:hover { border-color: #fda29b; background: #fef3f2; }
+.confirm-delete.yes { background: #b42318; color: #fff; border-color: #b42318; }
+.confirm-delete-ask { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85em; flex-wrap: wrap; }

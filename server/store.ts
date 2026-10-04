@@ -26,3 +26,8 @@ export function safeId(id: string): string {
   if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error(`Invalid id: ${id}`);
   return id;
 }
+
+/** Delete a JSON file under data/. Missing files are fine. */
+export async function deleteJson(rel: string): Promise<void> {
+  await fs.rm(path.join(DATA, rel), { force: true });
+}
