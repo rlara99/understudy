@@ -211,6 +211,11 @@ a.kr-card:hover .kr-play { transform: scale(1.08); }
 .kt-ask { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px dashed var(--rule-strong); border-radius: var(--radius); }
 .kt-ask .btn { align-self: flex-start; margin-top: 4px; }
 
+/* Delete buttons (ConfirmDelete) inside cards */
+.kr-foot, .inbox-done-foot, .wm-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.wm-detail-head { padding: 0 4px; }
+.push-right { margin-left: auto; }
+
 /* Learner Expert Minute */
 .lm-form { gap: 14px; padding: 20px; }
 .lm-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; font-weight: 500; color: #3f3f46; }

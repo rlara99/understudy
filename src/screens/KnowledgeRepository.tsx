@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClipPlayer } from "../capture/ClipPlayer";
 import { getJson } from "../shared/api";
+import { ConfirmDelete } from "../shared/ConfirmDelete";
+import { deleteWorkMap } from "../shared/deletes";
 import type { WorkMap } from "../shared/types";
 import { MasteryPanel } from "./MasteryPanel";
 import { computeMastery, useProgress, type StepStatus } from "./progress";
@@ -32,7 +34,8 @@ function useWorkMaps(pollMs = 0) {
       if (id) clearInterval(id);
     };
   }, [pollMs]);
-  return maps;
+  const remove = (mapId: string) => setMaps((m) => m && m.filter((x) => x.id !== mapId));
+  return { maps, remove };
 }
 
 /** Confirmed real maps first, then drafts, then the sample. */
@@ -45,7 +48,7 @@ const ordered = (maps: WorkMap[]) =>
   );
 
 export function KnowledgeRepository() {
-  const maps = useWorkMaps(5000);
+  const { maps, remove } = useWorkMaps(5000);
   const progress = useProgress();
   const [query, setQuery] = useState("");
 
@@ -102,8 +105,17 @@ export function KnowledgeRepository() {
                   <span className="meter" aria-hidden="true">
                     <span style={{ width: `${mastery.score ?? 0}%` }} />
                   </span>
-                  <span className="muted small">
-                    {mastery.score === null ? "Not started" : `${mastery.score}% mastered`}
+                  <span className="kr-foot">
+                    <span className="muted small">
+                      {mastery.score === null ? "Not started" : `${mastery.score}% mastered`}
+                    </span>
+                    <ConfirmDelete
+                      what="this task and its walkthrough"
+                      onConfirm={async () => {
+                        await deleteWorkMap(m.id);
+                        remove(m.id);
+                      }}
+                    />
                   </span>
                 </a>
               </li>
