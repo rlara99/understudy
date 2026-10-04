@@ -10,6 +10,8 @@ const path = require("node:path");
 // Dev: Vite on :5173 (proxies /api to the server on :8787).
 const APP_URL = process.env.UNDERSTUDY_URL || "http://localhost:5173";
 
+const ICON = path.join(__dirname, "understudy.ico");
+
 let mainWindow = null;
 let companionWindow = null;
 
@@ -27,6 +29,7 @@ function createMainWindow() {
     minWidth: 980,
     minHeight: 640,
     title: "Understudy",
+    icon: ICON,
     backgroundColor: "#ffffff",
     autoHideMenuBar: true,
     webPreferences,
@@ -58,6 +61,7 @@ function openCompanion(route) {
     minWidth: 340,
     minHeight: 420,
     title: "Understudy · Claudia",
+    icon: ICON,
     alwaysOnTop: true,
     autoHideMenuBar: true,
     backgroundColor: "#ffffff",
@@ -73,6 +77,9 @@ function openCompanion(route) {
 function closeCompanion() {
   if (companionWindow && !companionWindow.isDestroyed()) companionWindow.close();
 }
+
+// Taskbar grouping and icon on Windows.
+if (process.platform === "win32") app.setAppUserModelId("Understudy");
 
 app.whenReady().then(() => {
   const ses = session.defaultSession;
