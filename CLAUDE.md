@@ -1,208 +1,151 @@
 # Understudy
 
-Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLabs). Team: Renzo (voice agents, prompts, server, pitch) and Pablo (ERP, recording, screens, data). Repo: github.com/rlara99/understudy (private). Public overview: `README.md`. Original concept and build plan: `docs/concept-deck.html`, `docs/build-split.html`.
+Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLabs). Team: Renzo (voice agents, prompts, server, Electron, pitch) and Pablo (shell UI, ERP app, recording, screens, data). Repo: github.com/rlara99/understudy (private). Public overview: `README.md`. Original concept and build plan: `docs/concept-deck.html`, `docs/build-split.html`.
 
-An AI apprentice that captures an expert's judgment while they work (Capture), turns it into a Work Map (Map), coaches new hires on unseen cases (Teach), and sends questions it can't answer back to the right expert (the **Gap Loop**, our differentiator).
+An AI apprentice that captures an expert's judgment while they work, turns it into a Work Map, coaches new hires on cases the expert never showed, and sends questions it can't answer back to the right expert (the **Gap Loop**, our differentiator). It ships as a **Windows desktop app** (Electron) with two modes, Expert and Learner, plus a **separate ERP work app** in the browser.
 
-## Status
+## Start here (new Claude session)
 
-**The desktop app works end to end and was tested live by Renzo (Oct 3, evening):** Expert (Work mode live + record, Debrief & teach, Expert Minute) and Learner (Assistant, Knowledge Repository, Expert Minute), with the ERP as a separate app.
+- **Local checkout:** `C:\Users\renzo\understudy` (outside OneDrive on purpose). The hackathon notes/decks live in `...\OneDrive...\HackNation` (not the repo).
+- **Open the app:** Start menu or desktop → **Understudy** (purple "U"). It runs `npm run desktop` hidden; closing the window stops everything. **Understudy (browser)** opens the same app in Chrome. The ERP opens from the sidebar's **Open the work app (ERP) ↗** (in the default browser).
+- **Is it running?** ports 5173 (web) and 8787 (API) listening, and an Electron window titled "Understudy". Only one copy can run. If something is stuck: stop node/electron processes whose command line contains `understudy`, then relaunch from the icon. Logs: `%TEMP%\understudy.log` (desktop) / `%TEMP%\understudy-web.log` (browser).
+- **After changing `desktop/main.cjs` or `preload.cjs`** the app must be restarted; everything in `src/` hot-reloads (Ctrl+R, or reopen the companion window). After changing `.env*`, restart too.
+- **Keys:** `.env` (not committed) holds `ANTHROPIC_API_KEY` (an MIT **Parley** key, doesn't start with `sk-ant-`), `ANTHROPIC_BASE_URL=https://parley.api.mit.edu`, `ELEVENLABS_API_KEY` (Speech to Text only). Never print or commit them.
+- **Working with Renzo:** keep answers brief and give numbered test steps with ✅ expectations; Renzo tests by voice in the desktop app and reports back. Check the app's state yourself (ports, logs, `data/`) before asking. Pull before work, commit small, push right away (Pablo works in parallel); typecheck (`npx tsc --noEmit`) before every commit. Test server routes on throwaway files in `data/` and delete them after. Don't edit Pablo's files (see ownership); give Renzo a paste-able prompt for Pablo instead.
+
+## Status (Oct 3, night): everything works end to end, tested live
 
 | Piece | State |
 |---|---|
-| Work mode: live | Works. Claudia asks at task completion (save / switching invoice / vision "task done"), judges ask vs. acknowledge, reacts briefly. Stays quiet through silence. Sessions are **named** and can be **continued** (part 2, 3…). |
-| Work mode: record and learn | Works. Screen + mic (+ opt-in call audio) → ElevenLabs Scribe v2 transcript. No questions. |
-| Debrief & teach | Works. Sessions grouped **by name** (all parts together) → one draft map + gaps → 5-minute spoken debrief → Confirm → map named after the session. |
-| Assistant (Teach) | Works. Blocked save of INV-5102 as opex → clip + predict-then-explain. Typed or spoken questions; unknowns flagged to the learner's Expert Minute. |
-| Gap Loop | Works. Flagged → routed (Marta) → voice Quick Ask → map patched → badge clears. Duplicates merge ("asked by N"). |
-| Trust | Personal fields blurred; Off the record (ERP button, panel button, or spoken) pauses recording, events, mic and transcript. **Delete anything** (sessions + recordings, maps, steps, questions). |
-| README | Done (web version; update for desktop before submitting). |
+| Expert › Work mode: live | Claudia asks at task completion (save / switching invoice / vision "task done"), judges ask vs. acknowledge, reacts briefly, stays quiet through silence. Sessions are **named**, can be **continued** (part 2, 3…). Off the record. |
+| Expert › Work mode: record & learn | Screen + mic (+ opt-in call audio) → ElevenLabs Scribe v2 transcript. No questions. |
+| Expert › Debrief & teach | Sessions grouped **by day**, one row per **name** (all parts) → draft Work Map + gaps → 5-minute spoken debrief → Confirm. **Rename** sessions and the draft map; **Select day**, **Delete selected (n)**, per-row Delete. |
+| Expert › Expert Minute | Answer learners' questions by voice (Quick Ask) or text. Delete questions. |
+| Learner › Assistant | Tips while working (ERP events + vision for any app), typed/spoken questions; unknowns flagged → routed to the right expert. Blocked save of INV-5102 as opex → clip + predict-then-explain. |
+| Learner › Knowledge Repository | Tasks with walkthrough videos (step clips in order), mastery, delete task/step. |
+| Learner › Expert Minute | My questions + status/answers, submit new, withdraw. |
+| Gap Loop | Flagged → routed (Marta) → voice Quick Ask → map patched → badge clears. Duplicates merge ("asked by N"). |
+| Trust | Personal fields blurred; Off the record (ERP button, panel button, or spoken) pauses recording, events, mic and transcript; delete anything. |
+| Desktop | Electron main + always-on-top companion window; launch icons on desktop + Start menu; ERP link opens in the browser. |
 
-**Still to do:** Pablo's delete buttons in his screens (prompt sent), clean full run after **Reset demo** (delete rehearsal sessions/maps first), backup demo video (Pablo), pitch slides (5 Apprentice Test answers + moonshot), README update for the desktop app. Optional: "Export for agents" (Work Map → agent instructions), packaged installer.
+**Still to do:**
+1. **Pablo: rename buttons** in the Knowledge Repository (task cards) and the Work Map page header, using `<InlineRename>` + `renameWorkMap()` (prompt sent to Renzo to forward). Rename already works in Debrief & teach.
+2. Demo prep: delete rehearsal sessions/maps (Debrief & teach → Select day → Delete selected; Knowledge Repository → delete old tasks; keep the sample), **Reset demo**, one clean full run, Pablo records a backup video.
+3. Pitch slides (problem → live demo → Gap Loop → 5 Apprentice Test answers → moonshot). README update for the desktop app.
+4. Optional: "Export for agents" (Work Map → agent instructions, a brief stretch goal); real installer (electron-builder, server bundled, data in the user folder, keys entered on first run).
 
-## Desktop app
+## Modules and owners
 
-Electron app in this repo (`desktop/`), wrapping the same React app and server. Two modes, three modules each:
-
-| Mode | Module | What it does | Built from | Owner |
+| Mode | Module | Shell route (Pablo) | Session route / component (Renzo) | Owner |
 |---|---|---|---|---|
-| Expert | **Work mode: live** | Claudia watches any app (vision frames) or the ERP (exact events), asks at the right moments; off the record | Apprentice panel capture + `/api/frame` | Renzo |
-| Expert | **Work mode: record and learn** | Silent: records screen + mic + (opt-in) call audio, transcribes, no questions | Recorder + ElevenLabs speech-to-text | Renzo |
-| Expert | **Debrief and teach** | 5-minute spoken debrief over the day's recordings → confirmed Work Map | Debrief flow, multi-session `/api/map` | Renzo |
-| Expert | **Expert Minute** | Answer learners' open questions by voice | Inbox + Quick Ask | Pablo (UI), Renzo (voice) |
-| Learner | **Assistant** | Live tips while working; learner can ask anything; unknowns become gap questions | Tutor panel | Renzo |
-| Learner | **Knowledge Repository** | Tasks with walkthrough videos (step clips in sequence) | Library + Work Map + ClipPlayer | Pablo |
-| Learner | **Expert Minute** | My questions + status/answers; submit a new question | Open questions + `POST /api/questions` | Pablo (UI), Renzo (route) |
+| Expert | Work mode: live | `#/expert/live` (launch card) | `work/live` → `WorkSession mode="live"` (companion) | Renzo |
+| Expert | Work mode: record & learn | `#/expert/record` | `work/record` → `WorkSession mode="record"` (companion) | Renzo |
+| Expert | Debrief & teach | `#/expert/debrief` | `DebriefModule` (inside the shell) | Renzo |
+| Expert | Expert Minute | `#/expert/minute` | voice answer: `panel` → `ApprenticePanel` quick ask | Pablo (UI), Renzo (voice) |
+| Learner | Assistant | `#/learner/assist` | `learner/assistant` → `TutorPanel` (companion) | Renzo |
+| Learner | Knowledge Repository | `#/learner/knowledge[/<map id>]` | — | Pablo |
+| Learner | Expert Minute | `#/learner/minute` | `POST/GET /api/questions` | Pablo (UI), Renzo (route) |
+| — | ERP work app (separate) | `http://localhost:5173/erp/` (Sabrina `#/`, Lena `#/teach`) | — | Pablo |
 
-- Shell: left sidebar with an Expert/Learner switch and the three modules of each mode; simple, modern (Pablo). Builds and runs in the browser at :5173 too; Electron just loads it.
-- **The ERP is NOT part of Understudy.** It is a separate work app (owned and built by Pablo) that the expert/learner uses in a normal browser, like a real SAP/Excel. Understudy's nav has no ERP. The ERP talks to Understudy only through the API relay (below), so it can live on its own page, port or project.
-- **Relay between apps** (`server/routes/relay.ts`, `src/shared/relay.ts`, Renzo): `POST /api/relay/:channel` delivers a JSON message to every listener of `GET /api/relay/:channel` (Server-Sent Events). `publish(channel, msg)` / `subscribe(channel, fn)` in `src/shared/relay.ts`. CORS allows any `http://localhost:*` origin; an app on another port sets `VITE_API_BASE=http://localhost:8787`. Tested direct and through the Vite proxy.
-  - Channel `erp`: `publishErpEvent` / `onErpEvent` in `src/shared/bus.ts` now use the relay (same API as before, no caller changes).
-  - Channel `capture` (`src/capture/control.ts`, Pablo): Off the record sync (`state`, `request`, `ping`) and `reset` (Reset demo → the ERP drops its edits and the trainee's progress).
-  - Channel `progress` (`src/screens/progress.ts`, Pablo): the ERP owns the trainee's progress and answers `ping` with `{ kind: "state", progress }`; Understudy screens cache it. Not stored on the server (`data/sessions` is only for real session logs; `GET /api/sessions` lists every file there).
-- Electron (`desktop/`, Renzo): `main.cjs` opens the main window + a small always-on-top **companion** window for live sessions (Claudia status, mic, off the record) so people can work in other apps. Screen capture via `setDisplayMediaRequestHandler` (primary screen) with Windows `loopback` system audio when the page requests audio (call audio, opt-in). `preload.cjs` exposes `window.understudy` (`isDesktop`, `openCompanion(route)`, `closeCompanion()`, `focusMain()`). Use `openSession(route)` / `closeSession()` from `src/shared/desktop.ts` (falls back to same-tab navigation in a browser). Session routes: `work/live`, `work/record`, `learner/assistant`.
-- Run the desktop app: `npm run desktop` (Vite + API + Electron; Vite has `strictPort: true` because Electron loads :5173). `npm run dev` still runs the web version only. Kill leftover node/electron processes if :5173 is taken.
-- Needs `ELEVENLABS_API_KEY` in `.env` (server-side, Speech to Text) for record-and-learn transcription.
+Other routes: `map/<id>` (Work Map page), `library` (coverage overview). Session routes (`work/live`, `work/record`, `learner/assistant`, `panel`) render **bare** (no sidebar): they run in the 420 px companion window. Start them with `openSession(SESSION_ROUTES.x)`; `closeSession("expert/debrief")` closes the companion and switches the main window there (`window.understudy.showInMain`, IPC `main:navigate`). Old `#/inbox`, `#/tutor` still work. `#/erp` inside Understudy only links to the ERP app.
 
-### Pablo's modules (done, pushed): shell, ERP app, learner screens
-
-| What | Where | Notes |
-|---|---|---|
-| App shell | `src/shell/Shell.tsx` (`src/App.tsx` just renders it) | Sidebar: Expert/Learner switch (remembered), modules per mode, "Open the work app (ERP) ↗", **Reset demo**. All routes live here. |
-| Expert › Work mode: live / record | `#/expert/live`, `#/expert/record` | Launch cards → `openSession(workLive / workRecord)`. |
-| Expert › Debrief and teach | `#/expert/debrief` | Renzo's `DebriefModule` inside the shell. Work Maps open at `#/map/<id>`; coverage overview at `#/library`. |
-| Expert › Expert Minute | `#/expert/minute` (old `#/inbox`) | "Start voice session" → `setPendingQuickAsk` + `openSession(SESSION_ROUTES.quickAsk)`; "Answer in text" → `/api/patch`. |
-| Learner › Assistant | `#/learner/assist` | Launch card → `openSession(assistant)`; link opens the ERP as Lena. |
-| Learner › Knowledge Repository | `#/learner/knowledge`, `#/learner/knowledge/<map id>` | Task cards (search, mastery, open questions) and a walkthrough player: step clips in order (`ClipPlayer onClipEnd`), chapter list, expert's reason and rules, mastery, "Ask a question". Moments not in any recording fall back to step slides. |
-| Learner › Expert Minute | `#/learner/minute` | `POST /api/questions { question, context?, asker: LEARNER, mapId? }`, "My questions" from `GET /api/questions?asker=Lena`, plus "Recently answered for the team". |
-| ERP (separate app) | `http://localhost:5173/erp/` (`erp/index.html` → `src/erp/main.tsx`) | Signed-in user switch: Sabrina (expert, `#/`) or Lena (trainee, `#/teach`). Talks to Understudy only through the API and the relay. |
-
-Deletes (Renzo's `ConfirmDelete` + `src/shared/deletes.ts`): Knowledge Repository task cards (whole task), Work Map page ("Delete task" in the header → back to the Knowledge Repository; "Delete step" on the selected step's detail panel, since step rows are buttons), expert Expert Minute (open and answered questions), learner "My questions" (**Withdraw**, waiting questions only: deletes the question if Lena was the only asker, otherwise just removes her vote and name).
-
-Session routes render bare (no sidebar) in a browser too, as specified above. `#/erp` inside Understudy now shows "The ERP is its own app" with links.
-
-### Renzo's modules (done, pushed): how the shell plugs them in
-
-| Module | Route | Component | Opens in | Start it with |
-|---|---|---|---|---|
-| Work mode: live | `work/live` | `WorkSession mode="live"` | companion (bare route, no nav) | `openSession(SESSION_ROUTES.workLive)` |
-| Work mode: record and learn | `work/record` | `WorkSession mode="record"` | companion (bare route) | `openSession(SESSION_ROUTES.workRecord)` |
-| Debrief and teach | `expert/debrief` | `DebriefModule` | main window, inside the shell | link to `#/expert/debrief` |
-| Assistant | `learner/assistant` | `TutorPanel` (titled Assistant) | companion (bare route) | `openSession(SESSION_ROUTES.assistant)` |
-
-Keep the bare routes (`work/live`, `work/record`, `learner/assistant`) rendering without the shell; they run in the 420 px companion window. Work mode's "Go to Debrief & teach" calls `closeSession("expert/debrief")`, which closes the companion and switches the main window to that route (`window.understudy.showInMain`, IPC `main:navigate`).
-
-How Renzo's modules behave (so the shell copy matches):
-- **Naming and continuing:** Work mode setup asks for a session name and lists earlier un-debriefed sessions of the same kind ("Or continue an earlier one"). Continuing saves a new session file with the same `name` and `part = n + 1`; each part has its own recording, so clips stay aligned. Titles: `name` (+ " · part n").
-- **Debrief & teach** lists one row per `name` (all parts), ticks today's un-debriefed ones, and passes `workflow = name` when one name is selected. 5:00 cap (wrap-up nudge at 3:45, time-up at 4:40). Each row has a two-click **Delete** (all parts + recordings).
-- **Greeting:** full introduction the first time per computer, then a short one (`greeting()` in `src/agents/prompts.ts`, localStorage).
-- **Silence:** prompts tell both agents that "..." / silence is normal (no "Are you still there?"). Dashboard: **Advanced → Take turn after silence = 30 s** on both agents.
-- **Mic:** closed from the moment the app sends Claudia a message she must answer until she has finished speaking (`useMicHold`, max 5 s if she never starts), so noise can't cancel her reply; if she's still interrupted, the question is resent once. It is **never** closed after the user's own speech (that cut answers off mid-sentence). Live mode shows a mic level bar; Debug logs "heard you: …".
-- Vision (`/api/frame`) runs every 3 s (live) / 6 s (record) / 4 s (Assistant) on changed frames only, pauses while the ERP is sending events, and ignores the Understudy/Claudia window itself.
-
-APIs for the shell:
-- `GET /api/sessions` (newest first; `mode` live/record/capture, `name`, `part`, `title`, `reviewed_in`, counts).
-- **Deletes:** use `<ConfirmDelete what="…" onConfirm={…} />` (`src/shared/ConfirmDelete.tsx`, two clicks) with `deleteSession(id)` (also deletes its recording), `deleteWorkMap(id)` (its sessions become debriefable again), `deleteStep(mapId, stepId)` (orphaned guardrails go too; returns the map), `deleteQuestion(mapId, qid)` (returns the map) from `src/shared/deletes.ts`. Pablo is adding buttons to the Knowledge Repository, Work Map page and both Expert Minutes.
-- Learner Expert Minute: `GET /api/questions?asker=Lena` (status, answer, route_to, map_id) and `POST /api/questions { question, context?, asker: "Lena" }` (routes, merges duplicates; returns `{ question, merged, map_id }`). `LEARNER = "Lena"` is exported from `src/panel/TutorPanel.tsx`.
-- Expert Minute (expert side): open questions are in each map's `open_questions`; voice answers still go through `#/panel` via `setPendingQuickAsk(...)` (ApprenticePanel quick ask).
-- Knowledge Repository clips: a step's recording is `step.moment.session ?? map.id` (maps built from several sessions set `moment.session`). Pass that as `ClipPlayer sessionId`.
-
-## Run
-
-```
-npm install
-cp .env.example .env   # ANTHROPIC_API_KEY = Parley key, ANTHROPIC_BASE_URL=https://parley.api.mit.edu
-npm run dev            # web http://localhost:5173, API :8787 (8787 has no page: "Cannot GET /" is normal)
-npm run typecheck
-```
-
-Restart `npm run dev` after changing any `.env*` file. Only one copy can run (ports 5173/8787).
-
-**Without PowerShell (Windows):** run `powershell -ExecutionPolicy Bypass -File desktop\create-shortcuts.ps1` once. It puts two icons on the desktop: **Understudy** (`desktop/launch-desktop.vbs`: starts `npm run desktop` hidden, or just focuses the window if it's already running; closing the window stops everything; log in `%TEMP%\understudy.log`) and **Understudy (browser)** (`desktop/launch-browser.vbs`: starts `npm run dev` hidden if needed and opens http://localhost:5173; the server keeps running after the browser closes; log in `%TEMP%\understudy-web.log`). Icon: `desktop/understudy.ico`. A real installer (electron-builder, server bundled, data in the user folder) is a later step.
-
-## Demo flow
-
-| Role | Windows | Steps |
-|---|---|---|
-| Expert (Sabrina) | ERP `/erp/` + Understudy Expert › Work mode: live | Start live session, name it "Supplier invoices" (or continue it) → INV-4471 cost center 4711→0400, INV-4472 approval → second, INV-4473 status → held, saving each → Finish → Debrief and teach → tick "Supplier invoices" → Prepare → 5-minute debrief → Confirm Work Map |
-| New hire (Lena) | ERP `/erp/#/teach` + Understudy Learner › Assistant | Start assistant → INV-5102 saved as opex gets blocked → fix to 0400 + asset no. → INV-5103 (USD): "Sabrina never showed me this" → flagged. Knowledge Repository shows the walkthrough and her mastery. |
-| Other expert (Marta) | Understudy Expert › Expert Minute | Start voice session → Start Quick Ask → answer → "that's saved" |
-| Anyone | Sidebar | **Reset demo** restores the ERP, the sample map, progress and recordings. |
-
-Routes (`src/shell/Shell.tsx`): `expert/live`, `expert/record`, `expert/debrief`, `expert/minute`, `learner/assist`, `learner/knowledge[/<id>]`, `learner/minute`, `map/<id>`, `library`; sessions `work/live`, `work/record`, `learner/assistant`, `panel`. Old `#/inbox` and `#/tutor` still work.
-
-## Who owns what
+### File ownership
 
 Only edit files you own; change shared files together and push right away.
 
 | Path | Owner |
 |---|---|
-| `server/**`, `src/agents/**`, `src/panel/**` | Renzo |
+| `server/**`, `src/agents/**`, `src/panel/**`, `desktop/**` | Renzo |
 | `src/shell/**`, `src/erp/**`, `erp/`, `src/capture/**`, `src/screens/**`, `data/invoices.json`, `data/experts.json`, `data/seed/**` | Pablo |
 | `src/shared/**`, `src/App.tsx`, `src/styles.css`, `CLAUDE.md`, `README.md` | Shared |
 
-Git: `git pull` before starting, commit small, work on `main`. Generated session Work Maps (`data/workmaps/session-*.json`) and session logs are gitignored. Local test runs also modify `data/workmaps/sample-invoice-processing.json`: don't commit that; **Reset demo** restores it.
+Git: work on `main`. Gitignored: `.env`, session logs (`data/sessions/*.json`), generated maps (`data/workmaps/session-*.json`, `map-*.json` are local data). Local runs modify `data/workmaps/sample-invoice-processing.json`: don't commit it; Reset demo restores it from `data/seed/` (if you edit the sample on purpose, copy it to `data/seed/` too).
 
-## Architecture
+## How Renzo's modules behave
 
-- **ERP → panels:** the ERP publishes `ErpEvent`s over the relay channel `"erp"` (`src/shared/bus.ts`). `field_change` fires on blur/select, `keystroke` is throttled, `save` and `guardrail_blocked` on Save. No events while off the record.
-- **Apprentice panel** (`src/panel/ApprenticePanel.tsx`): phases capture → mapping → ready → debrief → confirming → done, plus quickask → patching → qadone (opened from the inbox via `src/screens/quickAsk.ts`). The screen recording start is the session's zero point (event `t` = ms since recording start, matching the video).
-- **Tutor panel** (`src/panel/TutorPanel.tsx`): loads the newest confirmed real map (sample as fallback), sends it as `[WORKMAP]`, shows the expert's clip on a blocked save, flags gaps.
-- **Work Map:** steps (moment, decision, reason in the expert's words), guardrails with machine `check` rules (`violatedGuardrails()` in `src/shared/guardrails.ts`), open_questions, confirmed.
-- **Recording:** `MediaRecorder` → IndexedDB (`src/capture/recordings.ts`). `ClipPlayer` plays 3 s before to 10 s after a moment, 30 s max. Off-the-record spans are cut from the recording.
-- **Storage:** JSON files in `data/` via `server/store.ts`. The sample map `data/workmaps/sample-invoice-processing.json` has a pristine copy in `data/seed/`: **if you edit the sample, copy it to `data/seed/` too**, because Reset demo restores it from there.
+- **Work mode setup:** session name field (default "Live/Recorded session · date") + "Or continue an earlier one" (un-debriefed sessions of the same kind). Continuing writes a new session file with the same `name` and `part = n + 1`; each part has its own recording so clips stay aligned. Title = `name` (+ " · part n"). Record mode has the opt-in "Also listen to call audio" (Windows loopback).
+- **Live triggers** (`src/agents/pauseRule.ts`): main trigger = task done (ERP save / switching invoice / vision `task_done`); mid-task only important fields (cost_center, approval, status) after a 2.5 s pause; ≥ 8 s between questions; resend once if unanswered after 5 s or interrupted.
+- **Debrief & teach:** day sections (Today / Yesterday / date) with **Select day**; one row per name with **Rename** (`renameSessions`) and Delete; bottom: **Prepare debrief (n)** + **Delete selected (n)**. Passes `workflow = name` when one name is selected; the draft map name is renamable before Confirm (`renameWorkMap`). 5:00 cap (wrap-up nudge at 3:45, time-up at 4:40).
+- **Assistant:** loads the newest confirmed real map (sample as fallback), sends it as `[WORKMAP]`; blocked save → expert's clip + predict-then-explain; "never showed me" / tutor says "flagged" / unknown typed question → `POST /api/questions` (asker `LEARNER = "Lena"`).
+- **Greeting:** full introduction the first time per computer, then short (`greeting()` in `src/agents/prompts.ts`, localStorage).
+- **Silence:** both prompts say "..." / silence is normal (no "Are you still there?").
+- **Mic** (`useMicHold`): closed from the moment the app sends Claudia a message she must answer until she finishes speaking (max 5 s if she never starts), so noise can't cancel her reply. **Never** closed after the user's own speech (that cut answers off). Mic level bar in live mode; Debug logs "heard you: …".
+- **Vision** (`/api/frame`, Haiku): every 3 s (live) / 6 s (record) / 4 s (Assistant), changed frames only, paused while the ERP sends events, ignores the Understudy/Claudia window.
+- **Spoken "let's debrief"** was tried and removed: the debrief starts only from its module.
 
-## Pablo's side: how it works and how to hook in
+## Shared building blocks (`src/shared/`)
 
-### ERP (`src/erp/ErpPage.tsx`, separate app at `/erp/`)
-- Loads invoices from `/api/invoices` (filtered by `phase`: Sabrina sees capture invoices, Lena teach invoices). Edits persist in localStorage per user until Reset demo.
-- Records the trainee's blocked and saved invoices (`recordBlocked` / `recordSaved`) and serves them on the `progress` relay channel.
-- Events it publishes (`t = Date.now()`):
-  - `invoice_opened` when an invoice is clicked.
-  - `field_change`: selects (cost center, approval, status) fire immediately; text fields (asset no., note) fire **once on blur**, not per keystroke.
-  - `keystroke`: at most one per field per second, field name only, never the text.
-  - `save` with `field: "status", from, to`. Saving an "open" invoice posts it.
-  - `guardrail_blocked` (teach mode only) with `field = guardrail id` and `note = guardrail text`.
-- Teach mode picks its Work Map with the same rule as the tutor: newest confirmed non-sample map, else newest non-sample, else the sample. It reloads the map on window focus so a Gap Loop patch applies without a refresh.
-- Capture mode never blocks a save.
+- `relay.ts` (`publish` / `subscribe`): messages between separate apps through the API (`POST|GET(SSE) /api/relay/:channel`). Channels: `erp` (ERP events, via `bus.ts`), `capture` (off the record + reset, Pablo's `control.ts`), `progress` (trainee progress, Pablo's `progress.ts`). CORS allows any `http://localhost:*`; an app on another port sets `VITE_API_BASE=http://localhost:8787`.
+- `desktop.ts`: `openSession`, `closeSession`, `SESSION_ROUTES`, `isDesktop`.
+- `ConfirmDelete.tsx` (two-click delete) + `deletes.ts`: `deleteSession(id)` (also its recording), `deleteWorkMap(id)` (its sessions become debriefable again), `deleteStep(mapId, stepId)` (orphaned guardrails go too), `deleteQuestion(mapId, qid)`.
+- `InlineRename.tsx` (name + "Rename" → field, Enter saves, Esc cancels) + `renames.ts`: `renameSessions(ids, name)` (maps built only from them follow), `renameWorkMap(id, name)` (its sessions follow if they shared one name).
+- `types.ts`, `guardrails.ts` (`violatedGuardrails`), `api.ts`, `bus.ts` (`formatMs` too).
+
+## Pablo's side: how it works
+
+### ERP (`src/erp/`, separate app at `/erp/`)
+- Loads invoices from `/api/invoices` (Sabrina: capture invoices; Lena: teach invoices). Edits persist in localStorage per user until Reset demo. Records the trainee's blocked/saved invoices and serves them on the `progress` channel.
+- Events (`t = Date.now()`): `invoice_opened`; `field_change` (selects immediately, text fields once on blur); `keystroke` (≤ 1/field/s, no text); `save` (`field: "status", from, to`; saving an open invoice posts it); `guardrail_blocked` (teach only, `field` = guardrail id, `note` = text). No events while off the record. Capture mode never blocks a save.
+- Teach mode picks its map like the Assistant and reloads on focus (Gap Loop patches apply without a refresh).
 
 ### Capture (`src/capture/`)
-- `useScreenRecorder()`: `start(sessionId)` opens the screen picker and returns the start time (use it as the session zero point); `stop()` resolves once the recording is stored. Also `offRecord`, `setOffRecord(on)`, `offRecordSpans()`, `grabFrame()` (null while off the record).
-- Recordings live in **IndexedDB** in the browser (`recordings.ts`), keyed by session id, with their off-the-record spans. No server route; any tab on localhost:5173 can replay them. Clearing site data deletes them.
-- `<ClipPlayer at={clip_s} sessionId? onClipEnd? onAvailable? />`: plays from 3 s before to 10 s after (max 30 s). Falls back to the newest recording if the session has none. Maps session time to video time around off-record spans (the paused footage is not in the file). `onAvailable(false)` when there's no recording or the moment is past its end; `onClipEnd` fires after a real play-through (used to chain walkthrough clips).
-- Gotcha: the duration fix seeks to the end of the file first; the clip seek waits for that to finish, or the browser pauses the clip right after it starts. Chrome also pauses video-only playback in hidden/background windows ("to save power"), so test walkthroughs in a visible window.
-- **Off the record**: the ERP shows a floating button while a recording runs. It talks to the recorder over the relay channel `"capture"` (`control.ts`: `state`, `request`, `ping`, `reset`). While off: the recorder is paused (no footage), the ERP publishes **no events**, and the ERP shows a striped banner.
+- `useScreenRecorder()`: `start(sessionId)` → start time (session zero point); `stop()`; `offRecord`, `setOffRecord(on)`, `offRecordSpans()`, `grabFrame()` (null while off the record).
+- Recordings live in **IndexedDB** (`recordings.ts`) keyed by session id, with off-record spans; `deleteRecording(id)`, `clearRecordings()`.
+- `<ClipPlayer at sessionId? onClipEnd? onAvailable? />`: 3 s before to 10 s after (max 30 s), maps around off-record cuts, falls back to the newest recording. Chrome pauses video in hidden windows: test walkthroughs in a visible window.
+- Off the record: ERP floating button + striped banner; relay channel `capture` (`state`, `request`, `ping`, `reset`).
 
-### Screens (`src/screens/`)
-- **Work Map** (`#/map/<id>`): step timeline; click a step to see its clip, decision, reason and guardrails. Reloads on focus.
-- **Library** (`#/library`, the coverage overview): one card per map with counts, new-hire mastery and an open-question badge; polls every 3 s.
-- **Expert Minute** (expert: `#/expert/minute`; learner: `#/learner/minute`): see the table above.
-- **Mastery panel** (on the Knowledge Repository task page): `useProgress()` from `progress.ts`. A step is "practice next" if any of its guardrails blocked a save, "mastered" if a saved invoice fell under one of its guardrails with no block.
-- **Reset demo** (sidebar, `resetDemo.ts`): sends `reset` on the `capture` channel (the ERP clears its edits and the trainee's progress), clears the cached progress, pending Quick Ask and recordings, and PUTs the sample map back from `data/seed/`. It does **not** delete Work Maps made by capture sessions: before the real demo, delete old ones from `data/workmaps/` (keep the sample) so the ERP and tutor don't teach from a rehearsal map.
+### Screens (`src/screens/`, shell `src/shell/Shell.tsx`)
+- Shell sidebar: Expert/Learner switch (remembered), modules per mode, "Open the work app (ERP) ↗", **Reset demo**.
+- Knowledge Repository: task cards (search, mastery, open questions) and a walkthrough player (step clips in order, chapter list, reasons and rules, mastery, "Ask a question"; step slides when a moment has no recording). Delete task; Work Map page: "Delete task" in the header, "Delete step" on the selected step.
+- Expert Minute: expert side (voice via `setPendingQuickAsk` + `openSession(SESSION_ROUTES.quickAsk)`, or text via `/api/patch`; delete questions); learner side (`POST /api/questions`, "My questions", "Recently answered for the team", **Withdraw**: deletes if Lena was the only asker, else removes her vote).
+- Mastery: a step is "practice next" if one of its guardrails blocked a save, "mastered" if a saved invoice fell under one with no block.
+- **Reset demo** (`resetDemo.ts`): `reset` on `capture` (ERP clears edits + progress), clears cached progress, pending Quick Ask, recordings, and restores the sample map from `data/seed/`. It does **not** delete maps made from sessions: delete rehearsal maps first.
+- Styles: tokens in `src/styles.css` (Inter, `--accent` indigo, `--ok/--warn/--bad` + `-soft`, `--radius`, `--shadow`, `--ring`, `--page-pad`); ERP look in `src/erp/erp.css`; screens in `src/screens/screens.css`; Renzo's session UI in `src/panel/session.css`.
 
-### Styles
-- `src/styles.css` (shared) holds the design tokens: Inter, `--accent` indigo, `--ok/--warn/--bad` (+ `-soft`), `--radius`, `--shadow`, `--ring`, `--page-pad`. Use the tokens instead of hex colors.
-- The ERP root is `.erp-app` (own look in `src/erp/erp.css`); screens use `src/screens/screens.css` (`.pill`, `.meter`, `button.primary`, `button.quiet`, `mark.gr`).
+## API (`server/`)
 
-### API (`server/`)
-
-- `GET /api/invoices`, `/api/experts`, `/api/workmaps`, `/api/sessions` (summaries); `GET|PUT /api/workmaps/:id`, `/api/sessions/:id`
-- `POST /api/map` `{ sessionIds | sessionId, workflow?, expert, team, mapId?, confirm?, debrief? }` → `{ map, gaps }`. First call drafts from one or more sessions (map id = the session id, or `map-<ts>` for several); `confirm: true` with the same `mapId` and the debrief transcript folds the answers in, marks confirmed and sets the sessions' `reviewed_in`. Ignores off-record spans. Steps carry `moment.session` (whose recording).
+- `GET /api/invoices`, `/api/experts`, `/api/workmaps`, `/api/sessions` (summaries: `mode`, `name`, `part`, `title`, `reviewed_in`, counts); `GET|PUT /api/workmaps/:id`, `/api/sessions/:id`.
+- `POST /api/map` `{ sessionIds | sessionId, workflow?, expert, team, mapId?, confirm?, debrief? }` → `{ map, gaps }`. Drafts from one or more sessions (map id = session id, or `map-<ts>` for several); `confirm: true` with the same `mapId` + the debrief transcript folds answers in, marks confirmed, sets sessions' `reviewed_in`. Ignores off-record spans. Steps carry `moment.session`.
 - `POST /api/route` `{ question, context?, open? }` → `{ expert_name, reason, neutral_question, duplicate_of }`.
-- `POST /api/questions` `{ question, context?, asker?, mapId? }` → `{ question, merged, map_id }` (routed + merged into the newest confirmed map); `GET /api/questions?asker=`.
-- `POST /api/patch` `{ workmapId, questionId, answer, expert }` → map with a new step and guardrails; stores `answer_clean` built from the confirmed repeat-back.
-- `POST /api/frame` `{ image, previous? }` → `{ app, changes[], task_done, judgment_call }` (Haiku, structured). Used by live, record and Assistant.
-- `POST /api/transcribe?speaker=expert|other&offset=ms` (raw audio body) → `{ lines }` via ElevenLabs Scribe v2 (`ELEVENLABS_API_KEY`).
-- `DELETE /api/sessions/:id`, `/api/workmaps/:id`, `/api/workmaps/:id/steps/:stepId`, `/api/workmaps/:id/questions/:qid`.
-- Relay: `POST|GET(SSE) /api/relay/:channel`.
+- `POST /api/questions` `{ question, context?, asker?, mapId? }` → `{ question, merged, map_id }`; `GET /api/questions?asker=`.
+- `POST /api/patch` `{ workmapId, questionId, answer, expert }` → map with new step + guardrails; stores `answer_clean` from the confirmed repeat-back.
+- `POST /api/frame` `{ image, previous? }` → `{ app, changes[], task_done, judgment_call }` (Haiku, structured).
+- `POST /api/transcribe?speaker=expert|other&offset=ms` (raw audio) → `{ lines }` (ElevenLabs Scribe v2).
+- Deletes: `DELETE /api/sessions/:id`, `/api/workmaps/:id`, `/api/workmaps/:id/steps/:stepId`, `/api/workmaps/:id/questions/:qid`.
+- Renames: `POST /api/sessions/rename { ids, name }`, `PATCH /api/workmaps/:id { workflow }` (1–80 chars; kept in sync both ways).
+- Relay: `POST|GET(SSE) /api/relay/:channel`. Health: `GET /api/health` → `{ ok, claudeKey }`.
 
-Claude goes through **MIT Parley** (Anthropic-compatible; the key does NOT start with `sk-ant-`). `server/env.ts` loads `.env` with override so a shell-level `ANTHROPIC_BASE_URL` can't win. Models: `claude-opus-5-5` (map, route, patch), `claude-haiku-4-5` (frames); override via `MAP_MODEL` / `FRAME_MODEL`. Structured outputs via `client.messages.parse` + zod (`server/claude.ts`).
+Claude via **MIT Parley** (Anthropic-compatible). `server/env.ts` loads `.env` with override so a shell-level `ANTHROPIC_BASE_URL` can't win. Models: `claude-opus-5-5` (map, route, patch), `claude-haiku-4-5` (frames); override with `MAP_MODEL` / `FRAME_MODEL`. Structured outputs via `client.messages.parse` + zod (`server/claude.ts`). Storage: JSON files under `data/` (`server/store.ts`, ids validated by `safeId`).
+
+## Desktop (`desktop/`, Renzo)
+
+- `main.cjs`: main window + always-on-top companion (420 px, top-right) for live sessions; `backgroundThrottling: false`; screen capture via `setDisplayMediaRequestHandler` (primary screen) with Windows `loopback` audio when the page asks for audio; mic/screen permissions allowed; links that open a new window (incl. the ERP) go to the default browser; single instance; app icon `understudy.ico`, AppUserModelId "Understudy".
+- `preload.cjs` → `window.understudy` (`isDesktop`, `platform`, `openCompanion(route)`, `closeCompanion()`, `focusMain()`, `showInMain(route)`).
+- Launchers: `launch-desktop.vbs` (runs `npm run desktop` hidden, or `npx electron .` to focus if already running), `launch-browser.vbs` (`npm run dev` hidden if needed, opens http://localhost:5173). `create-shortcuts.ps1` puts "Understudy" + "Understudy (browser)" on the desktop and in the Start menu (`powershell -ExecutionPolicy Bypass -File desktop\create-shortcuts.ps1`).
+- Scripts: `npm run desktop` (Vite + API + Electron; Vite `strictPort: true` because Electron loads :5173), `npm run dev` (web only), `npm run typecheck`.
 
 ## ElevenLabs
 
-- Two agents (Creator plan): Interviewer `agent_4001m41j8r97eqks9k6y6nk8x05p`, Tutor `agent_1201m41qmexxet890wg5vmqqzsgb`. IDs are committed in `.env.development` (public by nature).
-- Both are named **Claudia** (`AGENT_NAME`); the expert persona is **Sabrina**. Prompts and first messages live in `src/agents/prompts.ts` and are sent as **session overrides**: edit the code, not the dashboard. Each agent needs System prompt + First message overrides enabled in its Security tab. Interviewer has the Skip turn system tool on.
+- Two agents (Creator plan): Interviewer `agent_4001m41j8r97eqks9k6y6nk8x05p`, Tutor `agent_1201m41qmexxet890wg5vmqqzsgb` (IDs committed in `.env.development`; public by nature).
+- Both are named **Claudia** (`AGENT_NAME`); expert persona **Sabrina**, learner **Lena**, second expert **Marta** (`data/experts.json`). Prompts/first messages live in `src/agents/prompts.ts` and are sent as **session overrides**: edit the code, not the dashboard.
+- Dashboard settings that must stay on (both agents): Security → overrides for System prompt + First message; Advanced → **Take turn after silence = 30 s**. Interviewer: Tools → **Skip turn** on. LLM: whatever Renzo picked (Opus works; a Haiku-class model answers faster).
 - Dynamic variables: `agent_name`, `expert_name`, plus `mode` (live | debrief | quick_ask) for the Interviewer.
-- App → agent message prefixes. `[SCREEN]`, `[WORKMAP]`, `[OFF RECORD]`, `[ON RECORD]` are silent context updates. `[TASK DONE]`, `[PAUSE]`, `[GAPS]`, `[WRAP UP]`, `[TIME UP]`, `[QUESTION]`, `[ADDRESSED]`, `[OPENED]`, `[BLOCKED]`, `[SAVED]` are user messages that trigger a reply.
-- Timing (`src/agents/pauseRule.ts`): main trigger = task done; mid-task only important fields (cost_center, approval, status) after a 2.5 s pause; 8 s minimum gap; resend once if unanswered after 5 s or if interrupted.
-- Mic: picker in every session; closed while Claudia answers an app message (`useMicHold`) and while off the record; never closed after the user's own speech.
-- Dashboard settings that matter (both agents): Security → overrides for System prompt + First message; Advanced → **Take turn after silence = 30 s**; Interviewer: Tools → **Skip turn** on. A fast LLM keeps replies snappy (both currently use the model Renzo picked; Haiku-class is faster than Opus).
-- Spoken "let's debrief" was tried and **removed**: the debrief starts only from the Debrief & teach module.
+- App → agent prefixes. Silent context: `[SCREEN]`, `[WORKMAP]`, `[OFF RECORD]`, `[ON RECORD]`. Trigger a reply: `[TASK DONE]`, `[PAUSE]`, `[GAPS]`, `[WRAP UP]`, `[TIME UP]`, `[QUESTION]`, `[ADDRESSED]`, `[OPENED]`, `[BLOCKED]`, `[SAVED]`, `[DECIDING]`.
 
 ## Lessons / gotchas
 
-- **Never call `sendUserActivity`** on keystrokes: it holds the agent ~2 s and silently swallowed our nudges.
-- **Background noise cancels the agent's reply** in the 1–2 s while it prepares it, not only while it speaks. Hence `useMicHold` from the nudge on. But don't close the mic after the user speaks: a short pause mid-answer ends their turn and the rest of the sentence is lost.
-- **"Are you still there?"** comes from ElevenLabs' silence turn ("..." as a user message). Fixed in the prompts + Take turn after silence = 30 s.
-- Vision described the Claudia companion window as "work" (messy titles); the frame prompt now ignores it.
-- Changes to `desktop/main.cjs` / `preload.cjs` need an app restart (Ctrl+C, `npm run desktop`); everything in `src/` hot-reloads (Ctrl+R in a window, or reopen the companion).
-- If the agent "goes silent" on nudges, check the Debug list in the panel first, then the agent's Call history and LLM setting in the dashboard.
-- Gaps and guardrail checks: the map prompt must tell Claude to approximate checks with available fields (e.g. amount > 5000 EUR for "equipment"), otherwise the capex rule has no check and Teach can't catch the demo mistake.
-- Voice answers are messy transcripts; the patch uses the agent's confirmed repeat-back to store a clean answer.
-- Pablo's files use CRLF line endings; normalize before string-matching edits.
-- Starting a terminal-panel tab from Claude can time out; starting `npm run dev` in the background from Bash works.
-- **Electron binary missing after `npm install`** (`node_modules/electron/dist/electron.exe` absent, install takes ~3 s): npm's allow-scripts skipped Electron's download step. Run `node node_modules/electron/install.js` once.
-- **Blank page with "Invalid hook call" / two React copies** (`react.js?v=…` and `react-dom_client.js?v=…` from different builds) after installing packages while pages are open: stop the app, delete `node_modules/.vite`, restart, then fully reload every window (a hash change is not a reload).
+- **Never call `sendUserActivity`** on keystrokes: it holds the agent ~2 s and silently swallowed nudges.
+- **Background noise cancels the agent's reply** while it prepares it (1–2 s), not only while it speaks → `useMicHold` from the nudge on. But never close the mic after the user speaks: a short pause ends their turn and the rest of the sentence is lost.
+- **"Are you still there?"** is ElevenLabs' silence turn ("..."). Fixed in the prompts + Take turn after silence = 30 s.
+- Vision described the Claudia window as "work" → the frame prompt ignores it.
+- The map prompt must make Claude approximate guardrail checks with available fields (e.g. amount > 5000 EUR for "equipment"), or the capex rule has no check and Teach can't catch the demo mistake.
+- Voice answers are messy transcripts; `/api/patch` uses the agent's confirmed repeat-back.
+- Electron blocked same-origin `target="_blank"` links (the ERP button did nothing) → now every http(s) new-window link opens in the browser.
+- Windows Start search found only the browser shortcut until the shortcuts were also put in the Start menu.
+- Pablo's files use CRLF; normalize before string-matching edits. Editing via `node -e` with regexes/quotes breaks easily: prefer the Edit tool or a script file.
+- Starting a terminal-panel tab from Claude can time out; start servers with Bash `run_in_background` (and stop them afterwards so Renzo's launcher can bind the ports).
+- **Electron binary missing after `npm install`** (`node_modules/electron/dist/electron.exe` absent): run `node node_modules/electron/install.js` once.
+- **Blank page / "Invalid hook call" / two React copies** after installing packages while pages are open: stop the app, delete `node_modules/.vite`, restart, fully reload every window.
 
 ## Rules
 
