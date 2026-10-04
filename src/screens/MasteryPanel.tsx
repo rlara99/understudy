@@ -1,4 +1,4 @@
-// Owner: Pablo. New hire's progress against a Work Map: mastered steps, steps to practice,
+// New hire's progress against a Work Map: mastered steps, steps to practice,
 // and questions sent back to the expert. Shown on the Knowledge Repository task page.
 import type { WorkMap } from "../shared/types";
 import { computeMastery, useProgress } from "./progress";

@@ -1,4 +1,4 @@
-// Owner: Pablo. Hand-off from the Expert Minute inbox to the voice panel.
+// Hand-off from the Expert Minute inbox to the voice panel.
 // The inbox stores the question and opens #/panel; the panel calls takePendingQuickAsk()
 // on mount, switches to quick_ask mode, and on confirm POSTs /api/patch with these ids.
 

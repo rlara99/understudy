@@ -1,4 +1,4 @@
-// Owner: Pablo. Expert › Expert Minute: open questions routed to experts, no names of who asked.
+// Expert › Expert Minute: open questions routed to experts, no names of who asked.
 // "Start voice session" hands the question to the panel (quick_ask mode) via openSession:
 // a companion window on desktop, the same tab in a browser.
 // "Answer in text" is the fallback from the cut list: it patches the Work Map directly.

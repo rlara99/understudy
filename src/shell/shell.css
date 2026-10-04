@@ -1,4 +1,4 @@
-/* Owner: Pablo. App shell: sidebar + content. Uses the shared tokens in styles.css. */
+/* App shell: sidebar + content. Uses the shared tokens in styles.css. */
 .shell { display: grid; grid-template-columns: 264px minmax(0, 1fr); min-height: 100vh; }
 
 .side {

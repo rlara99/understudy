@@ -1,4 +1,4 @@
-/* Owner: Pablo. Fake ERP styled like modern AP software (Ramp / Brex feel) so it reads as real work software on screen.
+/* Fake ERP styled like modern AP software (Ramp / Brex feel) so it reads as real work software on screen.
    Root is .erp-app so nothing else in styles.css leaks in. Uses the shared tokens from styles.css. */
 .erp-app {
   min-height: 100vh;

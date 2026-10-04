@@ -1,6 +1,6 @@
 # Understudy
 
-Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLabs). Team: Renzo (voice agents, prompts, server, Electron, pitch) and Pablo (built the shell UI, ERP app, recording, screens, data; handed off, Renzo now owns everything). Repo: github.com/rlara99/understudy (private). Public overview: `README.md`. Original concept and build plan: `docs/concept-deck.html`, `docs/build-split.html`.
+Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLabs). Built by **Renzo Lara** (MIT Sloan): the whole app, from the voice agents, prompts, server and Claude pipeline to the Electron desktop app, the shell and screens, the ERP work app, capture, the live demo and the pitch videos. Repo: github.com/rlara99/understudy (private). Public overview: `README.md`. Original concept: `docs/concept-deck.html`.
 
 An AI apprentice that captures an expert's judgment while they work, turns it into a Work Map, coaches new hires on cases the expert never showed, and sends questions it can't answer back to the right expert (the **Gap Loop**, our differentiator). It ships as a **Windows desktop app** (Electron) with two modes, Expert and Learner, plus a **separate ERP work app** in the browser.
 
@@ -11,9 +11,9 @@ An AI apprentice that captures an expert's judgment while they work, turns it in
 - **Is it running?** ports 5173 (web) and 8787 (API) listening, and an Electron window titled "Understudy". Only one copy can run. If something is stuck: stop node/electron processes whose command line contains `understudy`, then relaunch from the icon. Logs: `%TEMP%\understudy.log` (desktop) / `%TEMP%\understudy-web.log` (browser).
 - **After changing `desktop/main.cjs` or `preload.cjs`** the app must be restarted; everything in `src/` hot-reloads (Ctrl+R, or reopen the companion window). After changing `.env*`, restart too.
 - **Keys:** `.env` (not committed) holds `ANTHROPIC_API_KEY` (an MIT **Parley** key, doesn't start with `sk-ant-`), `ANTHROPIC_BASE_URL=https://parley.api.mit.edu`, `ELEVENLABS_API_KEY` (Speech to Text only). Never print or commit them.
-- **Working with Renzo:** keep answers brief and give numbered test steps with ✅ expectations; Renzo tests by voice in the desktop app and reports back. Check the app's state yourself (ports, logs, `data/`) before asking. Pull before work, commit small, push right away; typecheck (`npx tsc --noEmit`) before every commit. Test server routes on throwaway files in `data/` and delete them after. Renzo owns every file now (Pablo handed off), so edit anything directly.
+- **Working with Renzo:** keep answers brief and give numbered test steps with ✅ expectations; Renzo tests by voice in the desktop app and reports back. Check the app's state yourself (ports, logs, `data/`) before asking. Pull before work, commit small, push right away; typecheck (`npx tsc --noEmit`) before every commit. Test server routes on throwaway files in `data/` and delete them after. Renzo owns every file, so edit anything directly.
 
-## Status (Oct 3, night): everything works end to end, tested live
+## Status (Oct 4): everything works end to end, tested live; submitted
 
 | Piece | State |
 |---|---|
@@ -28,11 +28,15 @@ An AI apprentice that captures an expert's judgment while they work, turns it in
 | Trust | Personal fields blurred; Off the record (ERP button, panel button, or spoken) pauses recording, events, mic and transcript; delete anything. |
 | Desktop | Electron main + always-on-top companion window; launch icons on desktop + Start menu; ERP link opens in the browser. |
 
-**Still to do:**
-1. ~~Rename buttons in the Knowledge Repository and Work Map page~~ done (Renzo, Oct 3): task cards, task page header, Work Map header.
-2. Demo prep: delete rehearsal sessions/maps (Debrief & teach → Select day → Delete selected; Knowledge Repository → delete old tasks; keep the sample), **Reset demo**, one clean full run, record a backup video.
-3. Pitch slides (problem → live demo → Gap Loop → 5 Apprentice Test answers → moonshot). README update for the desktop app.
-4. Optional: "Export for agents" (Work Map → agent instructions, a brief stretch goal); real installer (electron-builder, server bundled, data in the user folder, keys entered on first run).
+**Done Oct 4 (Renzo):**
+- Submission videos (team intro, product demo, technical walkthrough) built with ElevenLabs narration/music; files in the HackNation folder.
+- **Live demo:** https://understudy-rl-ara.vercel.app, a read-only build of this app (Vercel project `understudy`, deployed from the `live-demo` branch: `VITE_DEMO=1`, static API snapshot in `public/demo/`, relay over BroadcastChannel, AI and voice show a "runs in the desktop app" note). Keep it off `main`.
+- Bug fixes merged (`b86ca3c`): Expert Minute answers credited to the answering expert (`step.said_by`); no clips for quick-ask steps; Assistant clip uses `step.moment.session`; ERP dates in UTC; askers kept out of `/api/workmaps` and Claude; no extra vote on repeat asks; locked read-modify-write (`updateJson`); unmeetable guardrail checks dropped; one map rule for Assistant, ERP and questions (`src/shared/pickMap.ts`, `confirmed_at`); API on loopback only (`127.0.0.1:8787`, Vite proxy and launcher updated). Favicon added.
+
+**Still to do (optional):**
+1. Demo prep: delete rehearsal sessions/maps (Debrief & teach → Select day → Delete selected; Knowledge Repository → delete old tasks; keep the sample), **Reset demo**, one clean full run, record a backup video.
+2. README update for the desktop app.
+3. Optional: "Export for agents" (Work Map → agent instructions, a brief stretch goal); real installer (electron-builder, server bundled, data in the user folder, keys entered on first run).
 
 ## Modules
 
@@ -51,7 +55,7 @@ Other routes: `map/<id>` (Work Map page), `library` (coverage overview). Session
 
 ### Ownership
 
-**Renzo owns the whole codebase** (since Oct 3, night). Pablo built the shell, ERP, capture and screens, pushed all his work and handed off; there's no file split anymore and no need to coordinate edits. Old `// Owner: Pablo` / `SHARED FILE` header comments are history: edit those files freely.
+**Renzo built and owns the whole codebase.** There's no file split and no one to coordinate with. Old `SHARED FILE` header comments are history: edit those files freely.
 
 Git: work on `main`. Gitignored: `.env`, session logs (`data/sessions/*.json`), generated maps (`data/workmaps/session-*.json`, `map-*.json` are local data). Local runs modify `data/workmaps/sample-invoice-processing.json`: don't commit it; Reset demo restores it from `data/seed/` (if you edit the sample on purpose, copy it to `data/seed/` too).
 
@@ -69,13 +73,13 @@ Git: work on `main`. Gitignored: `.env`, session logs (`data/sessions/*.json`), 
 
 ## Shared building blocks (`src/shared/`)
 
-- `relay.ts` (`publish` / `subscribe`): messages between separate apps through the API (`POST|GET(SSE) /api/relay/:channel`). Channels: `erp` (ERP events, via `bus.ts`), `capture` (off the record + reset, Pablo's `control.ts`), `progress` (trainee progress, Pablo's `progress.ts`). CORS allows any `http://localhost:*`; an app on another port sets `VITE_API_BASE=http://localhost:8787`.
+- `relay.ts` (`publish` / `subscribe`): messages between separate apps through the API (`POST|GET(SSE) /api/relay/:channel`). Channels: `erp` (ERP events, via `bus.ts`), `capture` (off the record + reset, `src/capture/control.ts`), `progress` (trainee progress, `src/screens/progress.ts`). CORS allows any `http://localhost:*`; an app on another port sets `VITE_API_BASE=http://localhost:8787`.
 - `desktop.ts`: `openSession`, `closeSession`, `SESSION_ROUTES`, `isDesktop`.
 - `ConfirmDelete.tsx` (two-click delete) + `deletes.ts`: `deleteSession(id)` (also its recording), `deleteWorkMap(id)` (its sessions become debriefable again), `deleteStep(mapId, stepId)` (orphaned guardrails go too), `deleteQuestion(mapId, qid)`.
 - `InlineRename.tsx` (name + "Rename" → field, Enter saves, Esc cancels) + `renames.ts`: `renameSessions(ids, name)` (maps built only from them follow), `renameWorkMap(id, name)` (its sessions follow if they shared one name).
 - `types.ts`, `guardrails.ts` (`violatedGuardrails`), `api.ts`, `bus.ts` (`formatMs` too).
 
-## Shell, ERP, capture and screens: how they work (built by Pablo)
+## Shell, ERP, capture and screens: how they work
 
 ### ERP (`src/erp/`, separate app at `/erp/`)
 - Loads invoices from `/api/invoices` (Sabrina: capture invoices; Lena: teach invoices). Edits persist in localStorage per user until Reset demo. Records the trainee's blocked/saved invoices and serves them on the `progress` channel.
@@ -136,7 +140,7 @@ Claude via **MIT Parley** (Anthropic-compatible). `server/env.ts` loads `.env` w
 - Voice answers are messy transcripts; `/api/patch` uses the agent's confirmed repeat-back.
 - Electron blocked same-origin `target="_blank"` links (the ERP button did nothing) → now every http(s) new-window link opens in the browser.
 - Windows Start search found only the browser shortcut until the shortcuts were also put in the Start menu.
-- Pablo's files use CRLF; normalize before string-matching edits. Editing via `node -e` with regexes/quotes breaks easily: prefer the Edit tool or a script file.
+- Some files use CRLF; normalize before string-matching edits. Editing via `node -e` with regexes/quotes breaks easily: prefer the Edit tool or a script file.
 - Starting a terminal-panel tab from Claude can time out; start servers with Bash `run_in_background` (and stop them afterwards so Renzo's launcher can bind the ports).
 - **Electron binary missing after `npm install`** (`node_modules/electron/dist/electron.exe` absent): run `node node_modules/electron/install.js` once.
 - **Blank page / "Invalid hook call" / two React copies** after installing packages while pages are open: stop the app, delete `node_modules/.vite`, restart, fully reload every window.

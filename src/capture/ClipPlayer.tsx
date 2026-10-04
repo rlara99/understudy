@@ -1,4 +1,4 @@
-// Owner: Pablo. Plays the expert's screen recording from a given moment.
+// Plays the expert's screen recording from a given moment.
 // Used by the Work Map (click a step) and the tutor's replay_moment tool.
 import { useEffect, useRef, useState } from "react";
 import { loadRecording, toVideoSeconds, type Cut } from "./recordings";

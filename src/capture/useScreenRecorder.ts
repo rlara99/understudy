@@ -1,4 +1,4 @@
-// Owner: Pablo. Screen share + recording for replay, plus frame grabs for /api/frame.
+// Screen share + recording for replay, plus frame grabs for /api/frame.
 //
 // The recording's start time is the zero point for the whole session: set the panel's
 // startRef to the value start() returns, so every event's t lines up with the video.

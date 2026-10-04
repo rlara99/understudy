@@ -1,4 +1,4 @@
-// Owner: Pablo. Keeps screen recordings in IndexedDB so any tab on this origin
+// Keeps screen recordings in IndexedDB so any tab on this origin
 // (Work Map, tutor, ERP) can replay them. No server route needed for a one-laptop demo.
 
 const DB_NAME = "understudy";

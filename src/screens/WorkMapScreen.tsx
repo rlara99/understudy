@@ -1,4 +1,4 @@
-// Owner: Pablo. Work Map timeline: moment, decision, reason in the expert's words, guardrails.
+// Work Map timeline: moment, decision, reason in the expert's words, guardrails.
 // Click a step to replay the expert's screen at that moment.
 // Delete a step from its detail panel (its own guardrails go with it) or the whole task from the header.
 // Rename the task from the header (its sessions follow).

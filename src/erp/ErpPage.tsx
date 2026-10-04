@@ -1,4 +1,4 @@
-// Owner: Pablo. The fake ERP: a separate work app, not part of Understudy's nav.
+// The fake ERP: a separate work app, not part of Understudy's nav.
 // Runs at http://localhost:5173/erp/ (entry: erp/index.html → src/erp/main.tsx).
 // Every change is published as an ErpEvent over the API relay so Understudy can follow along.
 // Signed in as the trainee (teach mode), it loads the newest Work Map and blocks any save

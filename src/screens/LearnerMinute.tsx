@@ -1,4 +1,4 @@
-// Owner: Pablo. Learner › Expert Minute: ask the experts something no task covers yet,
+// Learner › Expert Minute: ask the experts something no task covers yet,
 // and follow your questions until an expert answers. Route: #/learner/minute.
 // Server (Renzo): POST /api/questions routes the question, merges duplicates and records the
 // asker; GET /api/questions?asker=<name> lists that learner's questions. Experts never see names.

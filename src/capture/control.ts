@@ -1,4 +1,4 @@
-// Owner: Pablo. Capture state shared between Understudy (which owns the recorder) and the
+// Capture state shared between Understudy (which owns the recorder) and the
 // separate ERP app (which shows the "Off the record" button and banner).
 // Goes through the API relay so it works across apps, browsers and the Electron window.
 import { publish, subscribe } from "../shared/relay";

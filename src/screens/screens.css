@@ -1,4 +1,4 @@
-/* Owner: Pablo. Work Map, Library, Expert Minute and Mastery. Uses the shared tokens in styles.css. */
+/* Work Map, Library, Expert Minute and Mastery. Uses the shared tokens in styles.css. */
 .small { font-size: 0.86em; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .eyebrow { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 4px 0 10px; }

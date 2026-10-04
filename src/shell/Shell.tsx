@@ -1,4 +1,4 @@
-// Owner: Pablo. Understudy's app shell: left sidebar with an Expert/Learner switch and each
+// Understudy's app shell: left sidebar with an Expert/Learner switch and each
 // mode's modules. Same UI in the browser (localhost:5173) and inside the Electron window.
 // Live sessions (work/live, work/record, learner/assistant, panel) start through openSession():
 // a small always-on-top companion window on desktop, this tab in a browser.

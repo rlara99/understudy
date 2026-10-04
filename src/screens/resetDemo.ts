@@ -1,4 +1,4 @@
-// Owner: Pablo. One click back to a clean demo between rehearsal runs.
+// One click back to a clean demo between rehearsal runs.
 import pristineSample from "../../data/seed/sample-invoice-processing.json";
 import { postControl } from "../capture/control";
 import { clearRecordings } from "../capture/recordings";

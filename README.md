@@ -2,7 +2,7 @@
 
 **An AI apprentice that learns from the expert, coaches the new hire, and goes back to ask about whatever it doesn't know yet.**
 
-Built at Hack-Nation's 7th Global AI Hackathon for Challenge 01, *The AI Apprentice* (powered by ElevenLabs), by Renzo Lara and Pablo Rivas (MIT Sloan).
+Built at Hack-Nation's 7th Global AI Hackathon for Challenge 01, *The AI Apprentice* (powered by ElevenLabs), by Renzo Lara (MIT Sloan).
 
 Experienced people carry decades of judgment that was never written down: why an invoice gets re-coded, which supplier double-bills in December, when to stop and ask. Screen recordings show *what* happened, not *why*. Understudy sits next to the expert while they work, asks why at the right moments, turns the session into a Work Map, and uses it to coach the next hire on cases the expert never showed.
 

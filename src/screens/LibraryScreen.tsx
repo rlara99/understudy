@@ -1,4 +1,4 @@
-// Owner: Pablo. Know-how Library: one card per Work Map with coverage counts, new-hire
+// Know-how Library: one card per Work Map with coverage counts, new-hire
 // mastery and open questions. Polls so the badge clears on its own after a Quick Ask patch.
 import { useEffect, useState } from "react";
 import { getJson } from "../shared/api";

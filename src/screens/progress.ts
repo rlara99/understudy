@@ -1,4 +1,4 @@
-// Owner: Pablo. What the new hire did in the work app: which saves went through and which
+// What the new hire did in the work app: which saves went through and which
 // guardrails stopped them.
 //
 // The ERP (a separate app) owns the record and shares it over the relay channel "progress":

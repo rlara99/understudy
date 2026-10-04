@@ -1,4 +1,4 @@
-// Owner: Pablo. Learner › Knowledge Repository: one card per task (Work Map), and a task page
+// Learner › Knowledge Repository: one card per task (Work Map), and a task page
 // with a walkthrough that plays the expert's step clips in sequence.
 // Routes: #/learner/knowledge and #/learner/knowledge/<workmap id>.
 import { useEffect, useMemo, useState } from "react";
