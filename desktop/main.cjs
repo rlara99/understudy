@@ -120,10 +120,11 @@ app.whenReady().then(() => {
     mainWindow.focus();
   });
 
-  // External links open in the browser, not inside the app.
+  // Links that open a new window (target="_blank") go to the normal browser: external sites,
+  // and our own pages like the ERP work app (/erp/), which is meant to run in the browser.
   app.on("web-contents-created", (_e, contents) => {
     contents.setWindowOpenHandler(({ url }) => {
-      if (!url.startsWith(APP_URL)) shell.openExternal(url);
+      if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
       return { action: "deny" };
     });
   });
