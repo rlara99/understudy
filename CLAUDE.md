@@ -1,6 +1,6 @@
 # Understudy
 
-Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLabs). Team: Renzo (voice agents, prompts, server, Electron, pitch) and Pablo (shell UI, ERP app, recording, screens, data). Repo: github.com/rlara99/understudy (private). Public overview: `README.md`. Original concept and build plan: `docs/concept-deck.html`, `docs/build-split.html`.
+Hack-Nation 7th Global AI Hackathon, Challenge 01 "The AI Apprentice" (ElevenLabs). Team: Renzo (voice agents, prompts, server, Electron, pitch) and Pablo (built the shell UI, ERP app, recording, screens, data; handed off, Renzo now owns everything). Repo: github.com/rlara99/understudy (private). Public overview: `README.md`. Original concept and build plan: `docs/concept-deck.html`, `docs/build-split.html`.
 
 An AI apprentice that captures an expert's judgment while they work, turns it into a Work Map, coaches new hires on cases the expert never showed, and sends questions it can't answer back to the right expert (the **Gap Loop**, our differentiator). It ships as a **Windows desktop app** (Electron) with two modes, Expert and Learner, plus a **separate ERP work app** in the browser.
 
@@ -11,7 +11,7 @@ An AI apprentice that captures an expert's judgment while they work, turns it in
 - **Is it running?** ports 5173 (web) and 8787 (API) listening, and an Electron window titled "Understudy". Only one copy can run. If something is stuck: stop node/electron processes whose command line contains `understudy`, then relaunch from the icon. Logs: `%TEMP%\understudy.log` (desktop) / `%TEMP%\understudy-web.log` (browser).
 - **After changing `desktop/main.cjs` or `preload.cjs`** the app must be restarted; everything in `src/` hot-reloads (Ctrl+R, or reopen the companion window). After changing `.env*`, restart too.
 - **Keys:** `.env` (not committed) holds `ANTHROPIC_API_KEY` (an MIT **Parley** key, doesn't start with `sk-ant-`), `ANTHROPIC_BASE_URL=https://parley.api.mit.edu`, `ELEVENLABS_API_KEY` (Speech to Text only). Never print or commit them.
-- **Working with Renzo:** keep answers brief and give numbered test steps with ✅ expectations; Renzo tests by voice in the desktop app and reports back. Check the app's state yourself (ports, logs, `data/`) before asking. Pull before work, commit small, push right away (Pablo works in parallel); typecheck (`npx tsc --noEmit`) before every commit. Test server routes on throwaway files in `data/` and delete them after. Don't edit Pablo's files (see ownership); give Renzo a paste-able prompt for Pablo instead.
+- **Working with Renzo:** keep answers brief and give numbered test steps with ✅ expectations; Renzo tests by voice in the desktop app and reports back. Check the app's state yourself (ports, logs, `data/`) before asking. Pull before work, commit small, push right away; typecheck (`npx tsc --noEmit`) before every commit. Test server routes on throwaway files in `data/` and delete them after. Renzo owns every file now (Pablo handed off), so edit anything directly.
 
 ## Status (Oct 3, night): everything works end to end, tested live
 
@@ -30,38 +30,32 @@ An AI apprentice that captures an expert's judgment while they work, turns it in
 
 **Still to do:**
 1. ~~Rename buttons in the Knowledge Repository and Work Map page~~ done (Renzo, Oct 3): task cards, task page header, Work Map header.
-2. Demo prep: delete rehearsal sessions/maps (Debrief & teach → Select day → Delete selected; Knowledge Repository → delete old tasks; keep the sample), **Reset demo**, one clean full run, Pablo records a backup video.
+2. Demo prep: delete rehearsal sessions/maps (Debrief & teach → Select day → Delete selected; Knowledge Repository → delete old tasks; keep the sample), **Reset demo**, one clean full run, record a backup video.
 3. Pitch slides (problem → live demo → Gap Loop → 5 Apprentice Test answers → moonshot). README update for the desktop app.
 4. Optional: "Export for agents" (Work Map → agent instructions, a brief stretch goal); real installer (electron-builder, server bundled, data in the user folder, keys entered on first run).
 
-## Modules and owners
+## Modules
 
-| Mode | Module | Shell route (Pablo) | Session route / component (Renzo) | Owner |
-|---|---|---|---|---|
-| Expert | Work mode: live | `#/expert/live` (launch card) | `work/live` → `WorkSession mode="live"` (companion) | Renzo |
-| Expert | Work mode: record & learn | `#/expert/record` | `work/record` → `WorkSession mode="record"` (companion) | Renzo |
-| Expert | Debrief & teach | `#/expert/debrief` | `DebriefModule` (inside the shell) | Renzo |
-| Expert | Expert Minute | `#/expert/minute` | voice answer: `panel` → `ApprenticePanel` quick ask | Pablo (UI), Renzo (voice) |
-| Learner | Assistant | `#/learner/assist` | `learner/assistant` → `TutorPanel` (companion) | Renzo |
-| Learner | Knowledge Repository | `#/learner/knowledge[/<map id>]` | — | Pablo |
-| Learner | Expert Minute | `#/learner/minute` | `POST/GET /api/questions` | Pablo (UI), Renzo (route) |
-| — | ERP work app (separate) | `http://localhost:5173/erp/` (Sabrina `#/`, Lena `#/teach`) | — | Pablo |
+| Mode | Module | Shell route | Session route / component |
+|---|---|---|---|
+| Expert | Work mode: live | `#/expert/live` (launch card) | `work/live` → `WorkSession mode="live"` (companion) |
+| Expert | Work mode: record & learn | `#/expert/record` | `work/record` → `WorkSession mode="record"` (companion) |
+| Expert | Debrief & teach | `#/expert/debrief` | `DebriefModule` (inside the shell) |
+| Expert | Expert Minute | `#/expert/minute` | voice answer: `panel` → `ApprenticePanel` quick ask |
+| Learner | Assistant | `#/learner/assist` | `learner/assistant` → `TutorPanel` (companion) |
+| Learner | Knowledge Repository | `#/learner/knowledge[/<map id>]` | — |
+| Learner | Expert Minute | `#/learner/minute` | `POST/GET /api/questions` |
+| — | ERP work app (separate) | `http://localhost:5173/erp/` (Sabrina `#/`, Lena `#/teach`) | — |
 
 Other routes: `map/<id>` (Work Map page), `library` (coverage overview). Session routes (`work/live`, `work/record`, `learner/assistant`, `panel`) render **bare** (no sidebar): they run in the 420 px companion window. Start them with `openSession(SESSION_ROUTES.x)`; `closeSession("expert/debrief")` closes the companion and switches the main window there (`window.understudy.showInMain`, IPC `main:navigate`). Old `#/inbox`, `#/tutor` still work. `#/erp` inside Understudy only links to the ERP app.
 
-### File ownership
+### Ownership
 
-Only edit files you own; change shared files together and push right away.
-
-| Path | Owner |
-|---|---|
-| `server/**`, `src/agents/**`, `src/panel/**`, `desktop/**` | Renzo |
-| `src/shell/**`, `src/erp/**`, `erp/`, `src/capture/**`, `src/screens/**`, `data/invoices.json`, `data/experts.json`, `data/seed/**` | Pablo |
-| `src/shared/**`, `src/App.tsx`, `src/styles.css`, `CLAUDE.md`, `README.md` | Shared |
+**Renzo owns the whole codebase** (since Oct 3, night). Pablo built the shell, ERP, capture and screens, pushed all his work and handed off; there's no file split anymore and no need to coordinate edits. Old `// Owner: Pablo` / `SHARED FILE` header comments are history: edit those files freely.
 
 Git: work on `main`. Gitignored: `.env`, session logs (`data/sessions/*.json`), generated maps (`data/workmaps/session-*.json`, `map-*.json` are local data). Local runs modify `data/workmaps/sample-invoice-processing.json`: don't commit it; Reset demo restores it from `data/seed/` (if you edit the sample on purpose, copy it to `data/seed/` too).
 
-## How Renzo's modules behave
+## How the session modules behave
 
 - **Work mode setup:** session name field (default "Live/Recorded session · date") + "Or continue an earlier one" (un-debriefed sessions of the same kind). Continuing writes a new session file with the same `name` and `part = n + 1`; each part has its own recording so clips stay aligned. Title = `name` (+ " · part n"). Record mode has the opt-in "Also listen to call audio" (Windows loopback).
 - **Live triggers** (`src/agents/pauseRule.ts`): main trigger = task done (ERP save / switching invoice / vision `task_done`); mid-task only important fields (cost_center, approval, status) after a 2.5 s pause; ≥ 8 s between questions; resend once if unanswered after 5 s or interrupted.
@@ -81,7 +75,7 @@ Git: work on `main`. Gitignored: `.env`, session logs (`data/sessions/*.json`), 
 - `InlineRename.tsx` (name + "Rename" → field, Enter saves, Esc cancels) + `renames.ts`: `renameSessions(ids, name)` (maps built only from them follow), `renameWorkMap(id, name)` (its sessions follow if they shared one name).
 - `types.ts`, `guardrails.ts` (`violatedGuardrails`), `api.ts`, `bus.ts` (`formatMs` too).
 
-## Pablo's side: how it works
+## Shell, ERP, capture and screens: how they work (built by Pablo)
 
 ### ERP (`src/erp/`, separate app at `/erp/`)
 - Loads invoices from `/api/invoices` (Sabrina: capture invoices; Lena: teach invoices). Edits persist in localStorage per user until Reset demo. Records the trainee's blocked/saved invoices and serves them on the `progress` channel.
