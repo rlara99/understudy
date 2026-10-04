@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipPlayer } from "../capture/ClipPlayer";
 import { getJson } from "../shared/api";
 import { ConfirmDelete } from "../shared/ConfirmDelete";
-import { deleteWorkMap } from "../shared/deletes";
+import { deleteStep, deleteWorkMap } from "../shared/deletes";
 import { InlineRename } from "../shared/InlineRename";
 import { renameWorkMap } from "../shared/renames";
 import type { WorkMap } from "../shared/types";
@@ -207,6 +207,14 @@ export function KnowledgeTask({ id }: { id: string }) {
           <a className="btn" href="/erp/#/teach" target="_blank" rel="noreferrer">
             Practice in the ERP ↗
           </a>
+          <ConfirmDelete
+            label="Delete task"
+            what="this task and its walkthrough"
+            onConfirm={async () => {
+              await deleteWorkMap(map.id);
+              location.hash = "#/learner/knowledge";
+            }}
+          />
         </div>
       </header>
 
@@ -256,7 +264,19 @@ export function KnowledgeTask({ id }: { id: string }) {
           </div>
 
           <article className="kt-caption">
-            <h3>{step.title}</h3>
+            <div className="wm-detail-head">
+              <h3>{step.title}</h3>
+              <ConfirmDelete
+                label="Delete step"
+                what="this step"
+                onConfirm={async () => {
+                  const updated = await deleteStep(map.id, step.id);
+                  setPlayingAll(false);
+                  setIndex((i) => Math.max(0, Math.min(i, updated.steps.length - 1)));
+                  setMap(updated);
+                }}
+              />
+            </div>
             <p>{step.decision}</p>
             <blockquote>
               <q>{step.reason}</q>
