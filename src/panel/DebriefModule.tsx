@@ -8,6 +8,8 @@ import { getJson, postJson } from "../shared/api";
 import { formatMs } from "../shared/bus";
 import { ConfirmDelete } from "../shared/ConfirmDelete";
 import { deleteSession } from "../shared/deletes";
+import { InlineRename } from "../shared/InlineRename";
+import { renameSessions, renameWorkMap } from "../shared/renames";
 import type { SessionLog, TranscriptLine, WorkMap } from "../shared/types";
 import "./session.css";
 import { useMicHold } from "./useMicHold";
@@ -263,7 +265,17 @@ function Debrief() {
                       <label key={g.key} className="ws-check">
                         <input type="checkbox" checked={ids.every((id) => selected.includes(id))} onChange={() => toggleGroup(ids)} />
                         <span>
-                          <b>{g.label}</b>
+                          <InlineRename
+                            value={g.label}
+                            onSave={async (name) => {
+                              await renameSessions(ids, name);
+                              setSessions((all) =>
+                                (all ?? []).map((x) =>
+                                  ids.includes(x.id) ? { ...x, name, title: `${name}${(x.part ?? 1) > 1 ? ` · part ${x.part}` : ""}` } : x,
+                                ),
+                              );
+                            }}
+                          />
                           <span className="muted small">
                             {timeOf(g.last)} · {kinds}
                             {g.parts.length > 1 ? ` · ${g.parts.length} parts` : ""} · {events} events · {lines} lines
@@ -303,7 +315,15 @@ function Debrief() {
         <section className="ws-run">
           <div className="ws-status">
             <span>
-              Draft: <b>{map.workflow}</b> · {map.steps.length} steps · {map.guardrails.length} guardrails
+              Draft:{" "}
+              <InlineRename
+                value={map.workflow}
+                onSave={async (name) => {
+                  const updated = await renameWorkMap(map.id, name);
+                  setMap(updated);
+                }}
+              />{" "}
+              · {map.steps.length} steps · {map.guardrails.length} guardrails
             </span>
             {phase === "debrief" && (
               <span style={{ color: secs >= WRAP_AT_S ? "#b91c1c" : undefined }}>

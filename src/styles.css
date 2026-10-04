@@ -158,3 +158,9 @@ main { padding: var(--page-pad); }
 .confirm-delete:hover { border-color: #fda29b; background: #fef3f2; }
 .confirm-delete.yes { background: #b42318; color: #fff; border-color: #b42318; }
 .confirm-delete-ask { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85em; flex-wrap: wrap; }
+/* Inline rename (src/shared/InlineRename.tsx) */
+.inline-rename { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.inline-rename-btn { font-size: 0.78em; padding: 2px 8px; border-radius: 6px; color: var(--muted, #71717a); background: transparent; border: 1px solid transparent; }
+.inline-rename-btn:hover { border-color: var(--rule, #e4e4e7); color: var(--accent, #4f46e5); }
+.inline-rename-btn.save { color: #fff; background: var(--accent, #4f46e5); border-color: var(--accent, #4f46e5); }
+.inline-rename input { font: inherit; padding: 4px 8px; min-width: 0; width: min(320px, 60vw); }

@@ -4,6 +4,7 @@ import express, { type ErrorRequestHandler } from "express";
 import { aiRoutes } from "./routes/ai";
 import { dataRoutes } from "./routes/data";
 import { deleteRoutes } from "./routes/deletes";
+import { renameRoutes } from "./routes/renames";
 import { relayRoutes } from "./routes/relay";
 
 const app = express();
@@ -16,7 +17,7 @@ app.use((req, res, next) => {
   if (origin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   }
   if (req.method === "OPTIONS") return void res.status(204).end();
   next();
@@ -28,6 +29,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api", relayRoutes);
 app.use("/api", dataRoutes);
 app.use("/api", deleteRoutes);
+app.use("/api", renameRoutes);
 app.use("/api", aiRoutes);
 
 const onError: ErrorRequestHandler = (err, _req, res, _next) => {
