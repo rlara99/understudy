@@ -4,6 +4,8 @@
 // "Answer in text" is the fallback from the cut list: it patches the Work Map directly.
 import { useEffect, useState } from "react";
 import { getJson, postJson } from "../shared/api";
+import { ConfirmDelete } from "../shared/ConfirmDelete";
+import { deleteQuestion } from "../shared/deletes";
 import { openSession, SESSION_ROUTES } from "../shared/desktop";
 import type { Expert, OpenQuestion, WorkMap } from "../shared/types";
 import { setPendingQuickAsk } from "./quickAsk";
@@ -53,8 +55,17 @@ export function InboxScreen() {
               <li key={`${q.map.id}.${q.id}`}>
                 <b>{q.q}</b>
                 <q>{q.answer_clean ?? q.answer}</q>
-                <span className="muted small">
-                  {q.route_to} · added to <a href={`#/map/${q.map.id}`}>{q.map.workflow}</a>
+                <span className="inbox-done-foot">
+                  <span className="muted small">
+                    {q.route_to} · added to <a href={`#/map/${q.map.id}`}>{q.map.workflow}</a>
+                  </span>
+                  <ConfirmDelete
+                    what="this question (the step it added stays)"
+                    onConfirm={async () => {
+                      await deleteQuestion(q.map.id, q.id);
+                      load();
+                    }}
+                  />
                 </span>
               </li>
             ))}
@@ -107,6 +118,15 @@ function QuestionCard({ item: q, expert, onAnswered }: { item: Item; expert?: Ex
           Asked by {q.asked_by_count} {q.asked_by_count === 1 ? "person" : "people"}
         </span>
         <span className="pill line">{q.map.workflow}</span>
+        <span className="push-right">
+          <ConfirmDelete
+            what="this question"
+            onConfirm={async () => {
+              await deleteQuestion(q.map.id, q.id);
+              onAnswered();
+            }}
+          />
+        </span>
       </span>
       <b className="inbox-q">{q.q}</b>
       {q.context && <span className="muted small">Seen on: {q.context}</span>}

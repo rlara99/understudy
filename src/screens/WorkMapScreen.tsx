@@ -1,8 +1,11 @@
 // Owner: Pablo. Work Map timeline: moment, decision, reason in the expert's words, guardrails.
 // Click a step to replay the expert's screen at that moment.
+// Delete a step from its detail panel (its own guardrails go with it) or the whole task from the header.
 import { useEffect, useState } from "react";
 import { ClipPlayer } from "../capture/ClipPlayer";
 import { getJson } from "../shared/api";
+import { ConfirmDelete } from "../shared/ConfirmDelete";
+import { deleteStep, deleteWorkMap } from "../shared/deletes";
 import type { WorkMap } from "../shared/types";
 import "./screens.css";
 
@@ -49,6 +52,14 @@ export function WorkMapScreen({ id }: { id: string }) {
             {map.steps.length} steps · {map.guardrails.length} guardrails
           </span>
           {open.length > 0 && <span className="pill gap">{open.length} open</span>}
+          <ConfirmDelete
+            label="Delete task"
+            what="this task and its walkthrough"
+            onConfirm={async () => {
+              await deleteWorkMap(map.id);
+              location.hash = "#/learner/knowledge";
+            }}
+          />
         </div>
       </header>
 
@@ -75,6 +86,19 @@ export function WorkMapScreen({ id }: { id: string }) {
         {step && (
           <article className="wm-detail" aria-live="polite">
             <ClipPlayer key={step.id} at={step.moment.clip_s} sessionId={step.moment.session ?? (map.sample ? undefined : map.id)} />
+            <div className="wm-detail-head">
+              <b>
+                Step {map.steps.indexOf(step) + 1}: {step.title}
+              </b>
+              <ConfirmDelete
+                label="Delete step"
+                what="this step"
+                onConfirm={async () => {
+                  setMap(await deleteStep(map.id, step.id));
+                  setSelected(null);
+                }}
+              />
+            </div>
             <dl className="wm-facts">
               <dt>Moment</dt>
               <dd>

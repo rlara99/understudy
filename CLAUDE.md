@@ -57,6 +57,8 @@ Electron app in this repo (`desktop/`), wrapping the same React app and server. 
 | Learner › Expert Minute | `#/learner/minute` | `POST /api/questions { question, context?, asker: LEARNER, mapId? }`, "My questions" from `GET /api/questions?asker=Lena`, plus "Recently answered for the team". |
 | ERP (separate app) | `http://localhost:5173/erp/` (`erp/index.html` → `src/erp/main.tsx`) | Signed-in user switch: Sabrina (expert, `#/`) or Lena (trainee, `#/teach`). Talks to Understudy only through the API and the relay. |
 
+Deletes (Renzo's `ConfirmDelete` + `src/shared/deletes.ts`): Knowledge Repository task cards (whole task), Work Map page ("Delete task" in the header → back to the Knowledge Repository; "Delete step" on the selected step's detail panel, since step rows are buttons), expert Expert Minute (open and answered questions), learner "My questions" (**Withdraw**, waiting questions only: deletes the question if Lena was the only asker, otherwise just removes her vote and name).
+
 Session routes render bare (no sidebar) in a browser too, as specified above. `#/erp` inside Understudy now shows "The ERP is its own app" with links.
 
 ### Renzo's modules (done, pushed): how the shell plugs them in

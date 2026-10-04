@@ -4,11 +4,27 @@
 // asker; GET /api/questions?asker=<name> lists that learner's questions. Experts never see names.
 import { useEffect, useState } from "react";
 import { LEARNER } from "../panel/TutorPanel";
-import { getJson, postJson } from "../shared/api";
+import { getJson, postJson, putJson } from "../shared/api";
+import { ConfirmDelete } from "../shared/ConfirmDelete";
+import { deleteQuestion } from "../shared/deletes";
 import type { OpenQuestion, WorkMap } from "../shared/types";
 import "./screens.css";
 
 type Listed = OpenQuestion & { map_id: string; workflow: string };
+
+/** Withdraw my question: delete it if I'm the only one who asked, otherwise just take my vote off. */
+async function withdraw(q: Listed) {
+  if (q.asked_by_count <= 1) {
+    await deleteQuestion(q.map_id, q.id);
+    return;
+  }
+  const map = await getJson<WorkMap>(`/api/workmaps/${q.map_id}`);
+  const target = map.open_questions.find((x) => x.id === q.id);
+  if (!target) return;
+  target.asked_by_count = Math.max(1, target.asked_by_count - 1);
+  target.askers = (target.askers ?? []).filter((a) => a !== LEARNER);
+  await putJson(`/api/workmaps/${map.id}`, map);
+}
 
 interface Posted {
   question: OpenQuestion;
@@ -144,9 +160,19 @@ export function LearnerMinute() {
                       </span>
                     </>
                   ) : (
-                    <span className="muted small">
-                      With {q.route_to ?? "the experts"}
-                      {q.route_reason ? `: ${q.route_reason}` : ""}
+                    <span className="inbox-done-foot">
+                      <span className="muted small">
+                        With {q.route_to ?? "the experts"}
+                        {q.route_reason ? `: ${q.route_reason}` : ""}
+                      </span>
+                      <ConfirmDelete
+                        label="Withdraw"
+                        what={q.asked_by_count > 1 ? "your vote on this question (others asked it too)" : "this question"}
+                        onConfirm={async () => {
+                          await withdraw(q);
+                          load();
+                        }}
+                      />
                     </span>
                   )}
                 </li>
