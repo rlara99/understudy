@@ -29,7 +29,7 @@ An AI apprentice that captures an expert's judgment while they work, turns it in
 | Desktop | Electron main + always-on-top companion window; launch icons on desktop + Start menu; ERP link opens in the browser. |
 
 **Still to do:**
-1. **Pablo: rename buttons** in the Knowledge Repository (task cards) and the Work Map page header, using `<InlineRename>` + `renameWorkMap()` (prompt sent to Renzo to forward). Rename already works in Debrief & teach.
+1. ~~Rename buttons in the Knowledge Repository and Work Map page~~ done (Renzo, Oct 3): task cards, task page header, Work Map header.
 2. Demo prep: delete rehearsal sessions/maps (Debrief & teach → Select day → Delete selected; Knowledge Repository → delete old tasks; keep the sample), **Reset demo**, one clean full run, Pablo records a backup video.
 3. Pitch slides (problem → live demo → Gap Loop → 5 Apprentice Test answers → moonshot). README update for the desktop app.
 4. Optional: "Export for agents" (Work Map → agent instructions, a brief stretch goal); real installer (electron-builder, server bundled, data in the user folder, keys entered on first run).
@@ -96,7 +96,7 @@ Git: work on `main`. Gitignored: `.env`, session logs (`data/sessions/*.json`), 
 
 ### Screens (`src/screens/`, shell `src/shell/Shell.tsx`)
 - Shell sidebar: Expert/Learner switch (remembered), modules per mode, "Open the work app (ERP) ↗", **Reset demo**.
-- Knowledge Repository: task cards (search, mastery, open questions) and a walkthrough player (step clips in order, chapter list, reasons and rules, mastery, "Ask a question"; step slides when a moment has no recording). Delete task; Work Map page: "Delete task" in the header, "Delete step" on the selected step.
+- Knowledge Repository: task cards (search, mastery, open questions) and a walkthrough player (step clips in order, chapter list, reasons and rules, mastery, "Ask a question"; step slides when a moment has no recording). Rename task (card, task page, Work Map header; `<InlineRename>` + `renameWorkMap`). Delete task; Work Map page: "Delete task" in the header, "Delete step" on the selected step.
 - Expert Minute: expert side (voice via `setPendingQuickAsk` + `openSession(SESSION_ROUTES.quickAsk)`, or text via `/api/patch`; delete questions); learner side (`POST /api/questions`, "My questions", "Recently answered for the team", **Withdraw**: deletes if Lena was the only asker, else removes her vote).
 - Mastery: a step is "practice next" if one of its guardrails blocked a save, "mastered" if a saved invoice fell under one with no block.
 - **Reset demo** (`resetDemo.ts`): `reset` on `capture` (ERP clears edits + progress), clears cached progress, pending Quick Ask, recordings, and restores the sample map from `data/seed/`. It does **not** delete maps made from sessions: delete rehearsal maps first.

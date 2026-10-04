@@ -1,11 +1,14 @@
 // Owner: Pablo. Work Map timeline: moment, decision, reason in the expert's words, guardrails.
 // Click a step to replay the expert's screen at that moment.
 // Delete a step from its detail panel (its own guardrails go with it) or the whole task from the header.
+// Rename the task from the header (its sessions follow).
 import { useEffect, useState } from "react";
 import { ClipPlayer } from "../capture/ClipPlayer";
 import { getJson } from "../shared/api";
 import { ConfirmDelete } from "../shared/ConfirmDelete";
 import { deleteStep, deleteWorkMap } from "../shared/deletes";
+import { InlineRename } from "../shared/InlineRename";
+import { renameWorkMap } from "../shared/renames";
 import type { WorkMap } from "../shared/types";
 import "./screens.css";
 
@@ -39,7 +42,7 @@ export function WorkMapScreen({ id }: { id: string }) {
     <div className="screen wm">
       <header className="wm-head">
         <div>
-          <h2>{map.workflow}</h2>
+          <InlineRename as="h2" value={map.workflow} onSave={async (name) => setMap(await renameWorkMap(map.id, name))} />
           <p className="muted">
             {map.expert} · {map.team}
           </p>

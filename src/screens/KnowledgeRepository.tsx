@@ -6,6 +6,8 @@ import { ClipPlayer } from "../capture/ClipPlayer";
 import { getJson } from "../shared/api";
 import { ConfirmDelete } from "../shared/ConfirmDelete";
 import { deleteWorkMap } from "../shared/deletes";
+import { InlineRename } from "../shared/InlineRename";
+import { renameWorkMap } from "../shared/renames";
 import type { WorkMap } from "../shared/types";
 import { MasteryPanel } from "./MasteryPanel";
 import { computeMastery, useProgress, type StepStatus } from "./progress";
@@ -35,7 +37,8 @@ function useWorkMaps(pollMs = 0) {
     };
   }, [pollMs]);
   const remove = (mapId: string) => setMaps((m) => m && m.filter((x) => x.id !== mapId));
-  return { maps, remove };
+  const replace = (map: WorkMap) => setMaps((m) => m && m.map((x) => (x.id === map.id ? map : x)));
+  return { maps, remove, replace };
 }
 
 /** Confirmed real maps first, then drafts, then the sample. */
@@ -48,7 +51,7 @@ const ordered = (maps: WorkMap[]) =>
   );
 
 export function KnowledgeRepository() {
-  const { maps, remove } = useWorkMaps(5000);
+  const { maps, remove, replace } = useWorkMaps(5000);
   const progress = useProgress();
   const [query, setQuery] = useState("");
 
@@ -95,7 +98,9 @@ export function KnowledgeRepository() {
                     {open > 0 && <span className="pill gap">{open} open</span>}
                     {m.sample && <span className="pill line">Sample</span>}
                   </span>
-                  <b className="lib-name">{m.workflow}</b>
+                  <span className="lib-name">
+                    <InlineRename value={m.workflow} onSave={async (name) => replace(await renameWorkMap(m.id, name))} />
+                  </span>
                   <span className="muted small">
                     Taught by {m.expert} · {m.team}
                   </span>
@@ -192,7 +197,7 @@ export function KnowledgeTask({ id }: { id: string }) {
       <a className="back" href="#/learner/knowledge">← Knowledge Repository</a>
       <header className="wm-head">
         <div>
-          <h2>{map.workflow}</h2>
+          <InlineRename as="h2" value={map.workflow} onSave={async (name) => setMap(await renameWorkMap(map.id, name))} />
           <p>
             Taught by {map.expert} · {map.team}
           </p>
